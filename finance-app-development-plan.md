@@ -15,7 +15,7 @@
 | Persistence | **SwiftData** | Apple's modern on-device ORM (built on Core Data). Since there's no backend, this removes the need to hand-roll sync/serialization logic. Design the schema to stay CloudKit-compatible from day one (avoid unique constraints, give every relationship a default/optional value) — costs nothing now, but keeps a future opt-in iCloud sync (e.g. for device migration or an iPad companion) a config change instead of a migration project |
 | Charts | Swift Charts | Native, free, integrates directly with SwiftData query results |
 | Architecture | MVVM + Repository | Keeps the "12 modules that all update shared balances" logic testable and out of the Views |
-| AI analysis | **Apple's on-device Foundation Models framework** (iOS 18.2+) | Since data must stay local, this is the only option that gives you real LLM-style reasoning without a network call. Fallback: a rules-based analysis engine you write yourself (see Phase 5) |
+| AI analysis | **Apple's on-device Foundation Models framework** (iOS 18.1+) | Since data must stay local, this is the only option that gives you real LLM-style reasoning without a network call. Fallback: a rules-based analysis engine you write yourself (see Phase 5) |
 | Local auth | Face ID / Passcode (LocalAuthentication framework) | This app holds a full financial picture — lock it behind biometrics by default |
 
 No backend, no API keys, no third-party financial data services needed for v1. This keeps the whole project buildable and testable entirely in Xcode/Simulator.
@@ -36,6 +36,11 @@ Account (protocol-like base concept, implemented per type)
 ├── Utility              (Provider, Service Acct #, Fee, Cut-off, Due Date)
 ├── IncomeSource         (Source Name, Category, Gross Amount, Currency, Pay Schedule)
 └── TaxFee               (Regulatory Name, Category, Amount, Currency, Fee Schedule)
+
+**Polymorphism decision (settle in Phase 0).** SwiftData `@Model` relationships must point to a concrete type — you can't relate a `Transaction` to a protocol, and SwiftData's class-inheritance support for polymorphic queries is still unreliable in practice. Before writing the schema, pick one:
+  (a) give `Transaction.mode` and `FinancialGoal.linkedAccounts` a separate optional relationship field per account type (8 nullable fields) and aggregate manually in the repository layer, or
+  (b) use a real class-inheritance hierarchy for `Account` and accept its rough edges (migration fragility, iffy fetch-descriptor support).
+  Option (a) is more boilerplate but far more predictable — recommended default unless you've already prototyped (b) successfully.
 
 **Currency field consistency.** Only `IncomeSource`/`TaxFee` carry an explicit `currency` field above — decide now whether this app is single-currency (in which case drop `currency` from those two and keep it implicit app-wide) or genuinely multi-currency (in which case every `Account` type and `Transaction` needs the field, plus a conversion strategy for the Dashboard's aggregated totals). Partial multi-currency support is a common source of silent scope creep — pick one path in Phase 0 and apply it uniformly.
 
@@ -94,8 +99,9 @@ Since there's no team and no rush, phases are ordered so each one is a fully wor
 - Basic Dashboard showing just these two totals
 
 **Phase 2 — Credit Cards & Loans**
-- Credit card setup, purchase tracking, payment tracking (auto-updates Available Balance & Card Balance)
+- Credit card setup, purchase tracking, payment tracking. `Available Balance` should be computed live as `Limit - Card Balance`, not stored independently — same live-compute/cache-for-display rule as everywhere else (see §5, Balance drift)
 - Loan setup, payment tracking, partial vs. full payoff logic
+- Extend `TransferService` (built in Phase 1) to cover bank↔card payment and bank↔loan payment as linked-transaction pairs — these are the same atomic double-entry pattern, not a new one-off implementation
 - Extend Dashboard with these totals + "upcoming dues" (needs Due Date across Cards/Loans/Utilities)
 
 **Phase 3 — Recurring modules**
@@ -116,6 +122,7 @@ Since there's no team and no rush, phases are ordered so each one is a fully wor
 - Full Dashboard (all totals + upcoming dues sorted by date)
 - Charts (spending by category, net worth trend, debt payoff trajectory)
 - CSV export **and full JSON backup/restore** — not just "nice to have." This app is the only copy of someone's full financial picture with no backend; without an explicit, human-triggerable export/restore path, the only safety net is an implicit iCloud device backup, which won't help against SwiftData corruption, an accidental delete, or moving to a new device before a backup runs. Treat backup/restore as a Phase 6 requirement, not a stretch goal
+- The JSON backup file itself must be encrypted or password-protected before it can land in Files/iCloud Drive/AirDrop — an app that's biometric-locked on-device but exports a plaintext dump of the user's full financial picture undermines its own security model
 - App Store screenshots/listing if you intend to publish
 
 ---
