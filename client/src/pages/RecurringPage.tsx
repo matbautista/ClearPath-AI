@@ -146,6 +146,7 @@ function UtilitiesSection({
   baseCurrency: string;
   onChange: () => void;
 }) {
+  const [editingId, setEditingId] = useState<number | null>(null);
   const [providerName, setProviderName] = useState("");
   const [defaultAccountId, setDefaultAccountId] = useState<number | "">("");
   const [dueDateDay, setDueDateDay] = useState<number | "">("");
@@ -156,12 +157,38 @@ function UtilitiesSection({
   const [nextRunDate, setNextRunDate] = useState("");
   const [errors, setErrors] = useState<string[]>([]);
 
+  function resetForm() {
+    setEditingId(null);
+    setProviderName("");
+    setDefaultAccountId("");
+    setDueDateDay("");
+    setCutOffDateDay("");
+    setPolicyType("");
+    setTemplateAmount("");
+    setNextRunDate("");
+    setErrors([]);
+  }
+
+  function startEdit(u: Utility) {
+    setEditingId(u.id);
+    setProviderName(u.providerName);
+    setDefaultAccountId(u.defaultAccountId);
+    setDueDateDay(u.dueDateDay ?? "");
+    setCutOffDateDay(u.cutOffDateDay ?? "");
+    setPolicyType(u.policyType ?? "");
+    setSchedule(u.schedule);
+    setTemplateAmount(u.templateAmountMinor / 100);
+    setNextRunDate(u.nextRunDate ?? "");
+    setErrors([]);
+    window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (defaultAccountId === "" || templateAmount === "") return;
     setErrors([]);
     try {
-      await api.createUtility({
+      const input = {
         providerName,
         defaultAccountId: Number(defaultAccountId),
         dueDateDay: dueDateDay === "" ? undefined : Number(dueDateDay),
@@ -170,14 +197,13 @@ function UtilitiesSection({
         schedule,
         templateAmountMinor: toMinorUnits(templateAmount),
         nextRunDate: schedule === "Variable" ? undefined : nextRunDate,
-      });
-      setProviderName("");
-      setDefaultAccountId("");
-      setDueDateDay("");
-      setCutOffDateDay("");
-      setPolicyType("");
-      setTemplateAmount("");
-      setNextRunDate("");
+      };
+      if (editingId != null) {
+        await api.updateUtility(editingId, input);
+      } else {
+        await api.createUtility(input);
+      }
+      resetForm();
       onChange();
     } catch (err) {
       setErrors(err instanceof ApiError ? err.errors : ["Something went wrong."]);
@@ -200,6 +226,7 @@ function UtilitiesSection({
                 <th>Schedule</th>
                 <th className="numeric">Amount</th>
                 <th>Next run</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
@@ -211,6 +238,11 @@ function UtilitiesSection({
                   <td className="muted">{u.schedule}</td>
                   <td className="numeric">{formatMinor(u.templateAmountMinor, baseCurrency)}</td>
                   <td className="muted">{u.nextRunDate ?? "—"}</td>
+                  <td>
+                    <button type="button" className="secondary" onClick={() => startEdit(u)}>
+                      Edit
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -219,7 +251,7 @@ function UtilitiesSection({
       </section>
 
       <section className="new-utility-form">
-        <h2>Add a utility</h2>
+        <h2>{editingId != null ? "Edit utility" : "Add a utility"}</h2>
         <form onSubmit={handleSubmit}>
         <div className="field-row field-row-even">
           <label>
@@ -272,13 +304,19 @@ function UtilitiesSection({
             Typical amount
             <input type="number" step="0.01" value={templateAmount} onChange={(e) => setTemplateAmount(e.target.value === "" ? "" : Number(e.target.value))} />
           </label>
-          {schedule !== "Variable" && (
+          {editingId == null && schedule !== "Variable" && (
             <label>
               Next run date
               <input type="date" value={nextRunDate} onChange={(e) => setNextRunDate(e.target.value)} />
             </label>
           )}
         </div>
+        {editingId != null && (
+          <p className="muted">
+            Next run date can't be changed here — it's managed by the missed-run catch-up schedule (2.7). Create a
+            new utility if you need a different one.
+          </p>
+        )}
         {errors.length > 0 && (
           <ul className="form-errors">
             {errors.map((err) => (
@@ -286,7 +324,12 @@ function UtilitiesSection({
             ))}
           </ul>
         )}
-        <button type="submit">Add utility</button>
+        <button type="submit">{editingId != null ? "Save changes" : "Add utility"}</button>
+        {editingId != null && (
+          <button type="button" className="secondary" onClick={resetForm} style={{ marginLeft: 8 }}>
+            Cancel
+          </button>
+        )}
         </form>
       </section>
     </>

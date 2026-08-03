@@ -357,6 +357,7 @@ export const api = {
   // recurring: utilities / income sources / tax fees / pending confirmations
   listUtilities: (): Promise<Utility[]> => get("/api/utilities"),
   createUtility: (input: NewUtilityInput): Promise<{ id: number }> => post("/api/utilities", input),
+  updateUtility: (id: number, input: NewUtilityInput): Promise<{ ok: true }> => patch(`/api/utilities/${id}`, input),
   listIncomeSources: (): Promise<IncomeSource[]> => get("/api/income-sources"),
   createIncomeSource: (input: NewIncomeSourceInput): Promise<{ id: number }> => post("/api/income-sources", input),
   listTaxFees: (): Promise<TaxFee[]> => get("/api/tax-fees"),
