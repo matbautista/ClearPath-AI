@@ -242,10 +242,6 @@ function UtilitiesSection({
         </div>
         <div className="field-row field-row-even">
           <label>
-            Due date (day of month)
-            <input type="number" min={1} max={31} value={dueDateDay} onChange={(e) => setDueDateDay(e.target.value === "" ? "" : Number(e.target.value))} />
-          </label>
-          <label>
             Cut-off date (day of month)
             <input
               type="number"
@@ -254,6 +250,10 @@ function UtilitiesSection({
               value={cutOffDateDay}
               onChange={(e) => setCutOffDateDay(e.target.value === "" ? "" : Number(e.target.value))}
             />
+          </label>
+          <label>
+            Due date (day of month)
+            <input type="number" min={1} max={31} value={dueDateDay} onChange={(e) => setDueDateDay(e.target.value === "" ? "" : Number(e.target.value))} />
           </label>
         </div>
         <div className="field-row field-row-even">
