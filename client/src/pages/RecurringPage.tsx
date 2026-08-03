@@ -185,35 +185,42 @@ function UtilitiesSection({
   }
 
   return (
-    <section>
-      <h2>Utilities</h2>
-      {utilities.length > 0 && (
-        <table>
-          <thead>
-            <tr>
-              <th>Provider</th>
-              <th>Policy type</th>
-              <th>Paid from</th>
-              <th>Schedule</th>
-              <th className="numeric">Amount</th>
-              <th>Next run</th>
-            </tr>
-          </thead>
-          <tbody>
-            {utilities.map((u) => (
-              <tr key={u.id}>
-                <td>{u.providerName}</td>
-                <td className="muted">{u.policyType ?? "—"}</td>
-                <td className="muted">{u.defaultAccountName}</td>
-                <td className="muted">{u.schedule}</td>
-                <td className="numeric">{formatMinor(u.templateAmountMinor, baseCurrency)}</td>
-                <td className="muted">{u.nextRunDate ?? "—"}</td>
+    <>
+      <section className="utilities-list">
+        <h2>Utilities</h2>
+        {utilities.length === 0 ? (
+          <p className="muted">No utilities yet — add your first one below.</p>
+        ) : (
+          <table>
+            <thead>
+              <tr>
+                <th>Provider</th>
+                <th>Policy type</th>
+                <th>Paid from</th>
+                <th>Schedule</th>
+                <th className="numeric">Amount</th>
+                <th>Next run</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-      <form onSubmit={handleSubmit} style={{ marginTop: utilities.length > 0 ? 16 : 0 }}>
+            </thead>
+            <tbody>
+              {utilities.map((u) => (
+                <tr key={u.id}>
+                  <td>{u.providerName}</td>
+                  <td className="muted">{u.policyType ?? "—"}</td>
+                  <td className="muted">{u.defaultAccountName}</td>
+                  <td className="muted">{u.schedule}</td>
+                  <td className="numeric">{formatMinor(u.templateAmountMinor, baseCurrency)}</td>
+                  <td className="muted">{u.nextRunDate ?? "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </section>
+
+      <section className="new-utility-form">
+        <h2>Add a utility</h2>
+        <form onSubmit={handleSubmit}>
         <div className="field-row field-row-even">
           <label>
             Provider name
@@ -280,8 +287,9 @@ function UtilitiesSection({
           </ul>
         )}
         <button type="submit">Add utility</button>
-      </form>
-    </section>
+        </form>
+      </section>
+    </>
   );
 }
 
@@ -328,35 +336,42 @@ function IncomeSourcesSection({
   }
 
   return (
-    <section>
-      <h2>Income Sources</h2>
-      {incomeSources.length > 0 && (
-        <table>
-          <thead>
-            <tr>
-              <th>Source</th>
-              <th>Category</th>
-              <th>Credited to</th>
-              <th>Schedule</th>
-              <th className="numeric">Amount</th>
-              <th>Next run</th>
-            </tr>
-          </thead>
-          <tbody>
-            {incomeSources.map((i) => (
-              <tr key={i.id}>
-                <td>{i.sourceName}</td>
-                <td className="muted">{i.incomeCategory}</td>
-                <td className="muted">{i.creditToAccountName}</td>
-                <td className="muted">{i.schedule}</td>
-                <td className="numeric">{formatMinor(i.templateAmountMinor, baseCurrency)}</td>
-                <td className="muted">{i.nextRunDate ?? "—"}</td>
+    <>
+      <section className="income-sources-list">
+        <h2>Income Sources</h2>
+        {incomeSources.length === 0 ? (
+          <p className="muted">No income sources yet — add your first one below.</p>
+        ) : (
+          <table>
+            <thead>
+              <tr>
+                <th>Source</th>
+                <th>Category</th>
+                <th>Credited to</th>
+                <th>Schedule</th>
+                <th className="numeric">Amount</th>
+                <th>Next run</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-      <form onSubmit={handleSubmit} style={{ marginTop: incomeSources.length > 0 ? 16 : 0 }}>
+            </thead>
+            <tbody>
+              {incomeSources.map((i) => (
+                <tr key={i.id}>
+                  <td>{i.sourceName}</td>
+                  <td className="muted">{i.incomeCategory}</td>
+                  <td className="muted">{i.creditToAccountName}</td>
+                  <td className="muted">{i.schedule}</td>
+                  <td className="numeric">{formatMinor(i.templateAmountMinor, baseCurrency)}</td>
+                  <td className="muted">{i.nextRunDate ?? "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </section>
+
+      <section className="new-income-source-form">
+        <h2>Add an income source</h2>
+        <form onSubmit={handleSubmit}>
         <div className="field-row">
           <label>
             Source name
@@ -408,8 +423,9 @@ function IncomeSourcesSection({
           </ul>
         )}
         <button type="submit">Add income source</button>
-      </form>
-    </section>
+        </form>
+      </section>
+    </>
   );
 }
 
@@ -457,33 +473,40 @@ function TaxFeesSection({
   }
 
   return (
-    <section>
-      <h2>Taxes &amp; Other Regulatory Fees</h2>
-      {taxFees.length > 0 && (
-        <table>
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Paid from</th>
-              <th>Schedule</th>
-              <th className="numeric">Amount</th>
-              <th>Next run</th>
-            </tr>
-          </thead>
-          <tbody>
-            {taxFees.map((t) => (
-              <tr key={t.id}>
-                <td>{t.regulatoryName}</td>
-                <td className="muted">{t.debitFromAccountName}</td>
-                <td className="muted">{t.schedule}</td>
-                <td className="numeric">{formatMinor(t.templateAmountMinor, baseCurrency)}</td>
-                <td className="muted">{t.nextRunDate ?? "—"}</td>
+    <>
+      <section className="tax-fees-list">
+        <h2>Taxes &amp; Other Regulatory Fees</h2>
+        {taxFees.length === 0 ? (
+          <p className="muted">No taxes/fees yet — add your first one below.</p>
+        ) : (
+          <table>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Paid from</th>
+                <th>Schedule</th>
+                <th className="numeric">Amount</th>
+                <th>Next run</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-      <form onSubmit={handleSubmit} style={{ marginTop: taxFees.length > 0 ? 16 : 0 }}>
+            </thead>
+            <tbody>
+              {taxFees.map((t) => (
+                <tr key={t.id}>
+                  <td>{t.regulatoryName}</td>
+                  <td className="muted">{t.debitFromAccountName}</td>
+                  <td className="muted">{t.schedule}</td>
+                  <td className="numeric">{formatMinor(t.templateAmountMinor, baseCurrency)}</td>
+                  <td className="muted">{t.nextRunDate ?? "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </section>
+
+      <section className="new-tax-fee-form">
+        <h2>Add a tax/fee</h2>
+        <form onSubmit={handleSubmit}>
         <div className="field-row">
           <label>
             Regulatory name
@@ -529,7 +552,8 @@ function TaxFeesSection({
           </ul>
         )}
         <button type="submit">Add tax/fee</button>
-      </form>
-    </section>
+        </form>
+      </section>
+    </>
   );
 }
