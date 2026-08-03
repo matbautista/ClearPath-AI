@@ -214,7 +214,7 @@ function UtilitiesSection({
         </table>
       )}
       <form onSubmit={handleSubmit} style={{ marginTop: utilities.length > 0 ? 16 : 0 }}>
-        <div className="field-row">
+        <div className="field-row field-row-even">
           <label>
             Provider name
             <input type="text" value={providerName} onChange={(e) => setProviderName(e.target.value)} placeholder="e.g. Meralco" />
@@ -239,6 +239,8 @@ function UtilitiesSection({
               ))}
             </select>
           </label>
+        </div>
+        <div className="field-row field-row-even">
           <label>
             Due date (day of month)
             <input type="number" min={1} max={31} value={dueDateDay} onChange={(e) => setDueDateDay(e.target.value === "" ? "" : Number(e.target.value))} />
@@ -254,7 +256,7 @@ function UtilitiesSection({
             />
           </label>
         </div>
-        <div className="field-row">
+        <div className="field-row field-row-even">
           <label>
             Schedule
             <SchedulePicker value={schedule} onChange={setSchedule} />

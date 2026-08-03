@@ -246,6 +246,24 @@ form {
   gap: 16px;
 }
 
+/* Guarantees every box in the row is exactly the same width, regardless
+   of label text length or how many fields are in the row (grid-auto-flow
+   creates one equal-width column per child automatically) — flex's equal
+   flex-grow only produces equal widths when nothing wraps first. */
+.field-row-even {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  align-items: start;
+}
+
+@media (max-width: 640px) {
+  .field-row-even {
+    grid-auto-flow: row;
+    grid-auto-columns: unset;
+  }
+}
+
 label {
   display: flex;
   flex-direction: column;
