@@ -6,6 +6,7 @@ import { accountsRouter } from "./routes/accounts.js";
 import { settingsRouter } from "./routes/settings.js";
 import { transactionsRouter } from "./routes/transactions.js";
 import { categoriesRouter } from "./routes/categories.js";
+import { goalsRouter } from "./routes/goals.js";
 import { requireAuth } from "./lib/session.js";
 
 const app = express();
@@ -22,6 +23,7 @@ app.use("/api/settings", settingsRouter);
 app.use("/api/accounts", requireAuth, accountsRouter);
 app.use("/api/transactions", requireAuth, transactionsRouter);
 app.use("/api/categories", requireAuth, categoriesRouter);
+app.use("/api/goals", requireAuth, goalsRouter);
 
 const PORT = process.env.PORT ? Number(process.env.PORT) : 4000;
 app.listen(PORT, () => {

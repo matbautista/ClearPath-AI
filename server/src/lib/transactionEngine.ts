@@ -7,6 +7,7 @@
 // stays the source of truth; see schema.sql's recomputation query).
 import { db } from "../db.js";
 import { TXN_RULES, type TxnType, type AccountType } from "./transactionRules.js";
+import { recomputeGoalsForAccount } from "./goalEngine.js";
 
 export interface PostTransactionInput {
   txnType: TxnType;
@@ -170,6 +171,7 @@ export function postTransaction(input: PostTransactionInput) {
       );
 
       db.exec("COMMIT");
+      recomputeGoalsForAccount(input.sourceAccountId);
       return { id: Number(info.lastInsertRowid), linkedTransactionId: null };
     }
 
@@ -254,6 +256,8 @@ export function postTransaction(input: PostTransactionInput) {
     );
 
     db.exec("COMMIT");
+    recomputeGoalsForAccount(input.sourceAccountId);
+    recomputeGoalsForAccount(input.destinationAccountId!);
     return { id: sourceLegId, linkedTransactionId: destLegId };
   } catch (err) {
     db.exec("ROLLBACK");

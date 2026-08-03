@@ -10,9 +10,22 @@ export class ApiError extends Error {
   }
 }
 
+// Any API call can 401 if the session expires or the server restarts
+// (session state is in-memory, see server/src/lib/session.ts) — without
+// this, a page's own error handling would silently show an empty list
+// instead of explaining why. The app registers a handler on mount that
+// bounces back to the Login screen.
+let onUnauthorized: (() => void) | null = null;
+export function setUnauthorizedHandler(fn: (() => void) | null) {
+  onUnauthorized = fn;
+}
+
 async function handle<T>(res: Response): Promise<T> {
   const body = res.status === 204 ? {} : await res.json();
-  if (!res.ok) throw new ApiError(res.status, body.errors ?? ["Unknown error."]);
+  if (!res.ok) {
+    if (res.status === 401) onUnauthorized?.();
+    throw new ApiError(res.status, body.errors ?? ["Unknown error."]);
+  }
   return body as T;
 }
 
@@ -23,6 +36,15 @@ function get<T>(path: string): Promise<T> {
 function post<T>(path: string, body?: unknown): Promise<T> {
   return fetch(path, {
     method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body ?? {}),
+  }).then(handle<T>);
+}
+
+function patch<T>(path: string, body?: unknown): Promise<T> {
+  return fetch(path, {
+    method: "PATCH",
     credentials: "include",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body ?? {}),
@@ -104,6 +126,41 @@ export interface NewTransactionInput {
   interestPortionMinor?: number;
 }
 
+export interface GoalLink {
+  id: number;
+  accountId: number;
+  accountName: string;
+  accountType: string;
+  allocationType: "FixedAmount" | "Percentage";
+  allocationValue: number;
+}
+
+export interface Goal {
+  id: number;
+  goalType: "DebtPayoff" | "EmergencyFund" | "SavingsTarget" | "InvestmentTarget";
+  targetAmountMinor: number;
+  targetDate: string | null;
+  strategy: "Snowball" | "Avalanche" | null;
+  totalMonthlyPaymentBudgetMinor: number | null;
+  status: "Active" | "Completed" | "Abandoned";
+  currentAmountMinor: number;
+  links: GoalLink[];
+}
+
+export interface NewGoalInput {
+  goalType: string;
+  targetAmountMinor?: number;
+  targetDate?: string;
+  strategy?: string;
+  totalMonthlyPaymentBudgetMinor?: number;
+}
+
+export interface NewGoalLinkInput {
+  accountId: number;
+  allocationType: "FixedAmount" | "Percentage";
+  allocationValue: number;
+}
+
 export const api = {
   // auth / settings
   settingsStatus: (): Promise<SettingsStatus> => get("/api/settings/status"),
@@ -126,4 +183,10 @@ export const api = {
     get(`/api/transactions${accountId ? `?accountId=${accountId}` : ""}`),
   createTransaction: (input: NewTransactionInput): Promise<{ id: number; linkedTransactionId: number | null }> =>
     post("/api/transactions", input),
+
+  // goals
+  listGoals: (): Promise<Goal[]> => get("/api/goals"),
+  createGoal: (input: NewGoalInput): Promise<Goal> => post("/api/goals", input),
+  addGoalLink: (goalId: number, input: NewGoalLinkInput): Promise<Goal> => post(`/api/goals/${goalId}/links`, input),
+  abandonGoal: (goalId: number): Promise<Goal> => patch(`/api/goals/${goalId}`, { status: "Abandoned" }),
 };

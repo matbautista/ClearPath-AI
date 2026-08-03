@@ -1,13 +1,14 @@
 import { useEffect, useState } from "react";
-import { api, ApiError, type Settings } from "./api";
+import { api, ApiError, setUnauthorizedHandler, type Settings } from "./api";
 import { SettingsContext } from "./SettingsContext";
 import { SetupPage } from "./pages/SetupPage";
 import { LoginPage } from "./pages/LoginPage";
 import { AccountsPage } from "./pages/AccountsPage";
 import { TransactionsPage } from "./pages/TransactionsPage";
+import { GoalsPage } from "./pages/GoalsPage";
 
 type Phase = "loading" | "setup" | "login" | "app";
-type Page = "accounts" | "transactions";
+type Page = "accounts" | "transactions" | "goals";
 
 function App() {
   const [phase, setPhase] = useState<Phase>("loading");
@@ -35,6 +36,14 @@ function App() {
 
   useEffect(() => {
     resolveAuthState();
+    // Any page's API call can 401 (session expired / server restarted) —
+    // bounce back to Login instead of letting the page silently show an
+    // empty list with no explanation.
+    setUnauthorizedHandler(() => {
+      setSettings(null);
+      setPhase("login");
+    });
+    return () => setUnauthorizedHandler(null);
   }, []);
 
   async function handleAuthenticated() {
@@ -64,12 +73,17 @@ function App() {
           <button className={page === "transactions" ? "nav-active" : "nav-link"} onClick={() => setPage("transactions")}>
             Transactions
           </button>
+          <button className={page === "goals" ? "nav-active" : "nav-link"} onClick={() => setPage("goals")}>
+            Goals
+          </button>
         </div>
         <button className="nav-link" onClick={handleLogout}>
           Log out
         </button>
       </nav>
-      {page === "accounts" ? <AccountsPage /> : <TransactionsPage />}
+      {page === "accounts" && <AccountsPage />}
+      {page === "transactions" && <TransactionsPage />}
+      {page === "goals" && <GoalsPage />}
     </SettingsContext.Provider>
   );
 }
