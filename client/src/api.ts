@@ -1,4 +1,4 @@
-import type { Account, NewAccountInput } from "./types";
+import type { Account, EditAccountInput, NewAccountInput } from "./types";
 
 export class ApiError extends Error {
   status: number;
@@ -336,6 +336,7 @@ export const api = {
   // accounts
   listAccounts: (): Promise<Account[]> => get("/api/accounts"),
   createAccount: (input: NewAccountInput): Promise<Account> => post("/api/accounts", input),
+  updateAccount: (id: number, input: EditAccountInput): Promise<Account> => patch(`/api/accounts/${id}`, input),
 
   // categories
   listCategories: (): Promise<SpendingCategory[]> => get("/api/categories"),

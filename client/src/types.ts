@@ -39,3 +39,14 @@ export interface NewAccountInput {
   dueDateDay?: number;
   cutOffDateDay?: number;
 }
+
+// Account Type and Beginning Balance aren't included — see the PATCH
+// handler in server/src/routes/accounts.ts for why they're not editable.
+export interface EditAccountInput {
+  accountName: string;
+  institutionName?: string;
+  interestRatePct?: number;
+  creditLimitMinor?: number;
+  loanAmountMinor?: number;
+  status: AccountStatus;
+}

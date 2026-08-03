@@ -125,3 +125,56 @@ accountsRouter.post("/", (req, res) => {
     res.status(500).json({ errors: [(err as Error).message] });
   }
 });
+
+// PATCH /api/accounts/:id — edit an existing account. Account Type and
+// Beginning Balance are deliberately not editable here: Beginning Balance
+// only seeds Current/Card Balance once at creation (2.1) and is never
+// revisited afterward (transactionEngine.ts increments the balance columns
+// in place per transaction, it doesn't re-derive them from Beginning
+// Balance + history), so changing it later would desync the stored balance
+// from its own transaction history. Changing Account Type would invalidate
+// every transaction and TXN_RULES check (2.3) already posted against the
+// original type. Status has no such hazard — closing an account has no
+// balance-zero requirement (2.1) — so it's editable here alongside the
+// same cosmetic/metadata fields exposed on create.
+accountsRouter.patch("/:id", (req, res) => {
+  const existing = db.prepare("SELECT * FROM accounts WHERE id = ?").get(req.params.id) as unknown as AccountRow | undefined;
+  if (!existing) return res.status(404).json({ errors: ["Account not found."] });
+
+  const body = req.body as Partial<AccountInput> & { status?: string };
+  const input: AccountInput = {
+    accountType: existing.account_type as AccountInput["accountType"],
+    accountName: body.accountName ?? existing.account_name,
+    institutionName: body.institutionName,
+    interestRatePct: body.interestRatePct,
+    creditLimitMinor: body.creditLimitMinor,
+    loanAmountMinor: body.loanAmountMinor,
+  };
+
+  const errors = validateAccountInput(input);
+  const status = body.status ?? existing.status;
+  if (status !== "Active" && status !== "Closed") errors.push("Status must be Active or Closed.");
+
+  if (errors.length > 0) return res.status(422).json({ errors });
+
+  try {
+    db.prepare(
+      `UPDATE accounts SET institution_name = @institutionName, account_name = @accountName,
+         interest_rate_pct = @interestRatePct, credit_limit_minor = @creditLimitMinor,
+         loan_amount_minor = @loanAmountMinor, status = @status, updated_at = datetime('now')
+       WHERE id = @id`
+    ).run({
+      institutionName: input.institutionName ?? null,
+      accountName: input.accountName.trim(),
+      interestRatePct: input.interestRatePct ?? null,
+      creditLimitMinor: input.creditLimitMinor ?? null,
+      loanAmountMinor: input.loanAmountMinor ?? null,
+      status,
+      id: req.params.id,
+    });
+    const row = db.prepare("SELECT * FROM accounts WHERE id = ?").get(req.params.id) as unknown as AccountRow;
+    res.json(toApiShape(row));
+  } catch (err) {
+    res.status(500).json({ errors: [(err as Error).message] });
+  }
+});

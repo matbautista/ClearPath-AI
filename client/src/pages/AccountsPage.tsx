@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { api, ApiError } from "../api";
 import { formatMinor, toMinorUnits } from "../lib/money";
 import { useSettings } from "../SettingsContext";
-import type { Account, AccountType, NewAccountInput } from "../types";
+import type { Account, AccountStatus, AccountType, NewAccountInput } from "../types";
 
 const ACCOUNT_TYPES: AccountType[] = ["Cash", "Bank", "EWallet", "Investment", "Loan", "CreditCard"];
 
@@ -15,7 +15,9 @@ const TYPE_LABELS: Record<AccountType, string> = {
   CreditCard: "Credit Card",
 };
 
-function emptyForm(): Partial<NewAccountInput> & { accountType: AccountType } {
+type FormState = Partial<NewAccountInput> & { accountType: AccountType; status?: AccountStatus };
+
+function emptyForm(): FormState {
   return { accountType: "Cash", accountName: "" };
 }
 
@@ -23,9 +25,10 @@ export function AccountsPage() {
   const { baseCurrency } = useSettings();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
-  const [form, setForm] = useState(emptyForm());
+  const [form, setForm] = useState<FormState>(emptyForm());
   const [formErrors, setFormErrors] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
 
   function load() {
     setLoading(true);
@@ -37,6 +40,27 @@ export function AccountsPage() {
 
   useEffect(load, []);
 
+  function resetForm() {
+    setEditingId(null);
+    setForm(emptyForm());
+    setFormErrors([]);
+  }
+
+  function startEdit(a: Account) {
+    setEditingId(a.id);
+    setForm({
+      accountType: a.accountType,
+      accountName: a.accountName,
+      institutionName: a.institutionName ?? undefined,
+      interestRatePct: a.interestRatePct ?? undefined,
+      creditLimitMinor: a.creditLimitMinor ?? undefined,
+      loanAmountMinor: a.loanAmountMinor ?? undefined,
+      status: a.status,
+    });
+    setFormErrors([]);
+    window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!form.accountName?.trim()) {
@@ -46,8 +70,19 @@ export function AccountsPage() {
     setSubmitting(true);
     setFormErrors([]);
     try {
-      await api.createAccount(form as NewAccountInput);
-      setForm(emptyForm());
+      if (editingId != null) {
+        await api.updateAccount(editingId, {
+          accountName: form.accountName,
+          institutionName: form.institutionName,
+          interestRatePct: form.interestRatePct,
+          creditLimitMinor: form.creditLimitMinor,
+          loanAmountMinor: form.loanAmountMinor,
+          status: form.status ?? "Active",
+        });
+      } else {
+        await api.createAccount(form as NewAccountInput);
+      }
+      resetForm();
       load();
     } catch (err) {
       setFormErrors(err instanceof ApiError ? err.errors : ["Something went wrong."]);
@@ -98,6 +133,7 @@ export function AccountsPage() {
                 <th>Institution</th>
                 <th className="numeric">Balance</th>
                 <th>Status</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
@@ -110,6 +146,11 @@ export function AccountsPage() {
                   <td>
                     <span className={`status-pill status-${a.status.toLowerCase()}`}>{a.status}</span>
                   </td>
+                  <td>
+                    <button type="button" onClick={() => startEdit(a)}>
+                      Edit
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -118,13 +159,14 @@ export function AccountsPage() {
       </section>
 
       <section className="new-account-form">
-        <h2>Add an account</h2>
+        <h2>{editingId != null ? "Edit account" : "Add an account"}</h2>
         <form onSubmit={handleSubmit}>
           <div className="field-row">
             <label>
               Type
               <select
                 value={form.accountType}
+                disabled={editingId != null}
                 onChange={(e) => setForm({ ...emptyForm(), accountType: e.target.value as AccountType })}
               >
                 {ACCOUNT_TYPES.map((t) => (
@@ -153,23 +195,37 @@ export function AccountsPage() {
                 />
               </label>
             )}
+            {editingId != null && (
+              <label>
+                Status
+                <select
+                  value={form.status ?? "Active"}
+                  onChange={(e) => setForm({ ...form, status: e.target.value as AccountStatus })}
+                >
+                  <option value="Active">Active</option>
+                  <option value="Closed">Closed</option>
+                </select>
+              </label>
+            )}
           </div>
 
           <div className="field-row">
-            <label>
-              {isCreditCard ? "Current balance owed" : "Beginning balance"}
-              <input
-                type="number"
-                step="0.01"
-                value={form.beginningBalanceMinor != null ? form.beginningBalanceMinor / 100 : ""}
-                onChange={(e) =>
-                  setForm({
-                    ...form,
-                    beginningBalanceMinor: e.target.value === "" ? undefined : toMinorUnits(Number(e.target.value)),
-                  })
-                }
-              />
-            </label>
+            {editingId == null && (
+              <label>
+                {isCreditCard ? "Current balance owed" : "Beginning balance"}
+                <input
+                  type="number"
+                  step="0.01"
+                  value={form.beginningBalanceMinor != null ? form.beginningBalanceMinor / 100 : ""}
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      beginningBalanceMinor: e.target.value === "" ? undefined : toMinorUnits(Number(e.target.value)),
+                    })
+                  }
+                />
+              </label>
+            )}
 
             {isCreditCard && (
               <label>
@@ -223,6 +279,15 @@ export function AccountsPage() {
             )}
           </div>
 
+          {editingId != null && (
+            <p className="muted">
+              Type and Beginning Balance can't be changed here — Beginning Balance only seeds the
+              starting balance once at setup, and the account's current balance is built from its
+              transaction history from then on. Status can be changed above (e.g. to close the
+              account).
+            </p>
+          )}
+
           {formErrors.length > 0 && (
             <ul className="form-errors">
               {formErrors.map((err) => (
@@ -232,8 +297,13 @@ export function AccountsPage() {
           )}
 
           <button type="submit" disabled={submitting}>
-            {submitting ? "Adding…" : "Add account"}
+            {submitting ? "Saving…" : editingId != null ? "Save changes" : "Add account"}
           </button>
+          {editingId != null && (
+            <button type="button" onClick={resetForm}>
+              Cancel
+            </button>
+          )}
         </form>
       </section>
     </div>
