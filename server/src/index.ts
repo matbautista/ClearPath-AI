@@ -1,6 +1,7 @@
 import express from "express";
-import cors from "cors";
 import cookieParser from "cookie-parser";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import "./db.js"; // bootstraps schema on first run
 import { accountsRouter } from "./routes/accounts.js";
 import { settingsRouter } from "./routes/settings.js";
@@ -19,8 +20,15 @@ import { runDueRecurringRules } from "./lib/recurringEngine.js";
 import { backfillSnapshots } from "./lib/netWorthEngine.js";
 import { runMoneyPitDetection } from "./lib/moneyPitEngine.js";
 
+const __dirname = dirname(fileURLToPath(import.meta.url));
+// server/ and client/ are siblings under the project root (same layout
+// db.ts already relies on for schema/data paths).
+const CLIENT_DIST = join(__dirname, "..", "..", "client", "dist");
+
 const app = express();
-app.use(cors());
+// No cors() here: client and API are served from the same origin in
+// production (this file serves client/dist below), so cross-origin
+// requests are neither expected nor wanted for a local financial app.
 app.use(express.json());
 app.use(cookieParser());
 
@@ -42,9 +50,21 @@ app.use("/api/dashboard", requireAuth, dashboardRouter);
 app.use("/api/money-pits", requireAuth, moneyPitsRouter);
 app.use("/api/ai-analysis", requireAuth, aiAnalysisRouter);
 
+// Serves the built client (client/dist, produced by `npm run build` in
+// client/) — collapses dev's two-process/two-port setup (Vite + Express)
+// into one process, one port, for local deployment. No catch-all route
+// to index.html is needed: the app is a single page with in-app state-
+// based navigation, not URL-based routing.
+app.use(express.static(CLIENT_DIST));
+
 const PORT = process.env.PORT ? Number(process.env.PORT) : 4000;
-app.listen(PORT, () => {
-  console.log(`[server] ClearPath AI API listening on http://localhost:${PORT}`);
+// Bind to loopback only — this is a local, single-user deployment with
+// no HTTPS in front of it; the passphrase and session cookie should
+// never leave the machine. Override via HOST if you deliberately want
+// LAN access (put a reverse proxy with TLS in front of it first).
+const HOST = process.env.HOST ?? "127.0.0.1";
+app.listen(PORT, HOST, () => {
+  console.log(`[server] ClearPath AI listening on http://${HOST}:${PORT}`);
 
   // All three jobs share the same missed-run philosophy (2.7/3.1/3.11a):
   // run once on boot to catch up on offline time, then on a periodic
