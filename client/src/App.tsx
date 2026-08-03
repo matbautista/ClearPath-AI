@@ -10,6 +10,7 @@ import { GoalsPage } from "./pages/GoalsPage";
 import { RecurringPage } from "./pages/RecurringPage";
 import { AiAssistPage } from "./pages/AiAssistPage";
 import { SettingsPage } from "./pages/SettingsPage";
+import clearPathLogo from "./assets/clearpath-logo.png";
 
 type Phase = "loading" | "setup" | "login" | "app";
 type Page = "dashboard" | "accounts" | "transactions" | "goals" | "recurring" | "ai-assist" | "settings";
@@ -69,7 +70,7 @@ function App() {
   return (
     <SettingsContext.Provider value={settings}>
       <nav className="app-nav">
-        <span className="app-brand">ClearPath AI</span>
+        <img src={clearPathLogo} alt="ClearPath AI" className="app-brand-logo" />
         <div className="app-nav-links">
           <button className={page === "dashboard" ? "nav-active" : "nav-link"} onClick={() => setPage("dashboard")}>
             Dashboard

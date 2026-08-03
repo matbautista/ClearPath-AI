@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { api, ApiError } from "../api";
+import clearPathLogo from "../assets/clearpath-logo.png";
 
 export function LoginPage({ onComplete }: { onComplete: () => void }) {
   const [passphrase, setPassphrase] = useState("");
@@ -23,7 +24,7 @@ export function LoginPage({ onComplete }: { onComplete: () => void }) {
   return (
     <div className="auth-page">
       <div className="auth-card">
-        <h1>ClearPath AI</h1>
+        <img src={clearPathLogo} alt="ClearPath AI" className="auth-logo" />
         <form onSubmit={handleSubmit}>
           <label>
             Passphrase

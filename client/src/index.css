@@ -320,6 +320,14 @@ button.secondary:hover:not(:disabled) {
   text-wrap: balance;
 }
 
+.auth-logo {
+  display: block;
+  height: 48px;
+  width: auto;
+  margin: 0 0 20px;
+  border-radius: 6px;
+}
+
 .auth-card .page-subtitle {
   margin-bottom: 24px;
 }
@@ -334,9 +342,10 @@ button.secondary:hover:not(:disabled) {
   border-bottom: 1px solid var(--border);
 }
 
-.app-brand {
-  font-weight: 700;
-  font-size: 1.05rem;
+.app-brand-logo {
+  height: 44px;
+  width: auto;
+  border-radius: 4px;
 }
 
 .app-nav-links {
