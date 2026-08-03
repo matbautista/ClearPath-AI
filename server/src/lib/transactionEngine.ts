@@ -49,7 +49,7 @@ export class ValidationError extends Error {
 // Payment (2.2, 2.4a) move only by the Principal Portion; every other leg
 // moves by Amount + that leg's own Additional Fees (2.5's fee rule — fees
 // are debited from the source leg only, so a destination leg's fee is 0).
-function ledgerAmount(opts: {
+export function ledgerAmount(opts: {
   accountType: AccountType;
   amountMinor: number;
   additionalFeesMinor: number;
@@ -263,4 +263,68 @@ export function postTransaction(input: PostTransactionInput) {
     db.exec("ROLLBACK");
     throw err;
   }
+}
+
+interface TransactionRow {
+  id: number;
+  txn_type: string;
+  indicator: "Debit" | "Credit";
+  amount_minor: number;
+  additional_fees_minor: number;
+  principal_portion_minor: number | null;
+  source_account_id: number;
+  linked_transaction_id: number | null;
+  status: string;
+}
+
+function oppositeIndicator(indicator: "Debit" | "Credit"): "Debit" | "Credit" {
+  return indicator === "Debit" ? "Credit" : "Debit";
+}
+
+// Voiding (2.6): transactions are immutable once Posted — corrections
+// happen by voiding the original (reversing its balance effect) and
+// entering a new correct transaction, never by editing history in
+// place. Voiding either leg of a two-leg transaction automatically
+// voids its paired leg in the same operation — the two legs can never
+// end up in different states, enforced here at the data layer rather
+// than left for the caller to do twice.
+export function voidTransaction(transactionId: number): { voidedIds: number[] } {
+  const txn = db.prepare("SELECT * FROM transactions WHERE id = ?").get(transactionId) as unknown as TransactionRow | undefined;
+  if (!txn) throw new ValidationError(["Transaction not found."]);
+  if (txn.status !== "Posted") throw new ValidationError(["Only Posted transactions can be voided (Pending Confirmation drafts are skipped instead, not voided)."]);
+
+  const legs: TransactionRow[] = [txn];
+  if (txn.linked_transaction_id) {
+    const paired = db.prepare("SELECT * FROM transactions WHERE id = ?").get(txn.linked_transaction_id) as unknown as TransactionRow | undefined;
+    if (!paired) throw new ValidationError(["Paired leg not found — data integrity issue, aborting rather than voiding only one side."]);
+    if (paired.status !== "Posted") {
+      throw new ValidationError(["Paired leg is not Posted — the two legs of a transaction should never be in different states."]);
+    }
+    legs.push(paired);
+  }
+
+  db.exec("BEGIN");
+  try {
+    for (const leg of legs) {
+      const account = getAccount(leg.source_account_id)!;
+      const rule = TXN_RULES[leg.txn_type as TxnType];
+      const requiresSplit = !!rule && rule.legs === "two" && rule.requiresPrincipalInterestSplit;
+      const amt = ledgerAmount({
+        accountType: account.account_type,
+        amountMinor: leg.amount_minor,
+        additionalFeesMinor: leg.additional_fees_minor,
+        principalPortionMinor: leg.principal_portion_minor ?? undefined,
+        requiresSplit,
+      });
+      applyBalanceDelta(account, oppositeIndicator(leg.indicator), amt);
+      db.prepare("UPDATE transactions SET status = 'Voided', updated_at = datetime('now') WHERE id = ?").run(leg.id);
+    }
+    db.exec("COMMIT");
+  } catch (err) {
+    db.exec("ROLLBACK");
+    throw err;
+  }
+
+  for (const leg of legs) recomputeGoalsForAccount(leg.source_account_id);
+  return { voidedIds: legs.map((l) => l.id) };
 }

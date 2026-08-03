@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "../db.js";
-import { postTransaction, ValidationError, type PostTransactionInput } from "../lib/transactionEngine.js";
+import { postTransaction, voidTransaction, ValidationError, type PostTransactionInput } from "../lib/transactionEngine.js";
 import { TXN_RULES, INCOME_CATEGORIES, type TxnType } from "../lib/transactionRules.js";
 
 export const transactionsRouter = Router();
@@ -64,6 +64,19 @@ transactionsRouter.post("/", (req, res) => {
   try {
     const result = postTransaction(input);
     res.status(201).json(result);
+  } catch (err) {
+    if (err instanceof ValidationError) return res.status(422).json({ errors: err.errors });
+    res.status(500).json({ errors: [(err as Error).message] });
+  }
+});
+
+// POST /api/transactions/:id/void — 2.6: reverses the balance effect and
+// marks Voided; automatically voids the paired leg too if this is one
+// half of a two-leg transaction.
+transactionsRouter.post("/:id/void", (req, res) => {
+  try {
+    const result = voidTransaction(Number(req.params.id));
+    res.json(result);
   } catch (err) {
     if (err instanceof ValidationError) return res.status(422).json({ errors: err.errors });
     res.status(500).json({ errors: [(err as Error).message] });

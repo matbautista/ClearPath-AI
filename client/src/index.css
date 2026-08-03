@@ -182,9 +182,23 @@ tr:last-child td {
   color: var(--status-closed-text);
 }
 
-.status-completed {
+.status-completed, .status-pendingconfirmation {
   background: var(--status-completed-bg);
   color: var(--status-completed-text);
+}
+
+.status-voided {
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
+tr.txn-voided td {
+  color: var(--text-muted);
+  text-decoration: line-through;
+}
+
+tr.txn-voided td:last-child, tr.txn-voided td:nth-last-child(2) {
+  text-decoration: none;
 }
 
 form {

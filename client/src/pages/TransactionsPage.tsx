@@ -64,6 +64,16 @@ export function TransactionsPage() {
 
   useEffect(loadAll, []);
 
+  async function handleVoid(id: number) {
+    if (!confirm("Void this transaction? This reverses its balance effect (and its paired leg's, if any) — it does not delete history (2.6).")) return;
+    try {
+      await api.voidTransaction(id);
+      loadAll();
+    } catch (err) {
+      alert(err instanceof ApiError ? err.errors.join(" ") : "Something went wrong.");
+    }
+  }
+
   const rule = rules[txnType];
 
   const sourceOptions = useMemo(() => {
@@ -167,11 +177,13 @@ export function TransactionsPage() {
                 <th>Category</th>
                 <th className="numeric">Amount</th>
                 <th>To</th>
+                <th>Status</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
               {transactions.map((t) => (
-                <tr key={t.id}>
+                <tr key={t.id} className={t.status === "Voided" ? "txn-voided" : undefined}>
                   <td>{t.txnDate}</td>
                   <td>{TXN_TYPE_LABELS[t.txnType] ?? t.txnType}</td>
                   <td className="muted">{t.spendingCategoryName ?? t.incomeCategory ?? "—"}</td>
@@ -180,6 +192,18 @@ export function TransactionsPage() {
                     {formatMinor(t.amountMinor, baseCurrency)}
                   </td>
                   <td className="muted">{t.destinationAccountName ?? "—"}</td>
+                  <td>
+                    {t.status !== "Posted" && (
+                      <span className={`status-pill status-${t.status.toLowerCase()}`}>{t.status}</span>
+                    )}
+                  </td>
+                  <td>
+                    {t.status === "Posted" && (
+                      <button type="button" className="secondary" onClick={() => handleVoid(t.id)}>
+                        Void
+                      </button>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>

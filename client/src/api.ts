@@ -323,6 +323,7 @@ export const api = {
     get(`/api/transactions${accountId ? `?accountId=${accountId}` : ""}`),
   createTransaction: (input: NewTransactionInput): Promise<{ id: number; linkedTransactionId: number | null }> =>
     post("/api/transactions", input),
+  voidTransaction: (id: number): Promise<{ voidedIds: number[] }> => post(`/api/transactions/${id}/void`),
 
   // goals
   listGoals: (): Promise<Goal[]> => get("/api/goals"),
