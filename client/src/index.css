@@ -474,9 +474,15 @@ button.secondary:hover:not(:disabled) {
 /* --- Dashboard --- */
 .stat-tile-row {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  grid-template-columns: repeat(3, 1fr);
   gap: 12px;
   margin-bottom: 24px;
+}
+
+@media (max-width: 640px) {
+  .stat-tile-row {
+    grid-template-columns: 1fr;
+  }
 }
 
 .stat-tile {
