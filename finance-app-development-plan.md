@@ -28,15 +28,15 @@ No backend, no API keys, no third-party financial data services needed for v1. T
 Everything in your spec collapses into a handful of SwiftData models. The key insight from your spec: **every module (Cash, Bank, Investments, Loans, Cards, Utilities, Income, Taxes) is really just "an account/source" that owns a stream of `Transaction`s**, and the dashboard is just aggregation over those.
 
 ```
-Account (protocol-like base concept, implemented per type — every concrete type below carries `status: open/closed`, decided once in Phase 0 rather than bolted on per-type later)
+Account (protocol-like base concept, implemented per type — every concrete type below carries `status: open/closed`, decided once in Phase 0 rather than bolted on per-type later; on `CashWallet` specifically this is vestigial and always `open`, since there's exactly one instance and no real-world "closing" concept for physical cash on hand — keep it for schema uniformity, not because it does anything there)
 ├── CashWallet          (single instance: current cash-on-hand balance)
 ├── BankAccount          (Bank Name, Account #, Account Name, Beginning/Current Balance)
 ├── InvestmentAccount    (Broker, Account #, Beginning/Current Balance)
 ├── Loan                 (Lender, Loan #, Principal, Balance, Interest Rate, Term, Due Date → RecurringSchedule)
 ├── CreditCard           (Issuer, Limit, Available/Card Balance, Interest Rate, Cut-off → RecurringSchedule, Due Date → RecurringSchedule)
 ├── Utility              (Provider, Service Acct #, Fee, Cut-off → RecurringSchedule, Due Date → RecurringSchedule)
-├── IncomeSource         (Source Name, Category, Gross Amount, Currency, Pay Schedule)
-└── TaxFee               (Regulatory Name, Category, Amount, Currency, Fee Schedule)
+├── IncomeSource         (Source Name, Category, Gross Amount, Currency, Pay Schedule → RecurringSchedule)
+└── TaxFee               (Regulatory Name, Category, Amount, Currency, Fee Schedule → RecurringSchedule)
 
 **`status` belongs on the shared `Account` concept, decided in Phase 0.** A fully-paid-off loan, a closed card, or a bank/investment account the user closes out shouldn't disappear (that destroys transaction history) or get deleted (that risks cascading the delete into its transactions, depending on the relationship delete rule chosen). Add an explicit `open`/`closed` status to every account type from the start — not just Loan/CreditCard — since `BankAccount` ships in Phase 1, a full phase before any per-type retrofit would happen, and adding it later is exactly the kind of structural schema change that's expensive once real data exists (see §5). Closed accounts drop out of active dashboard totals and "upcoming dues" but stay queryable in history. Note `Loan` and `CreditCard` reach `closed` differently: a `Loan` naturally transitions when `Balance` hits zero via full payoff, but a `CreditCard` can be closed by user action while `Card Balance` is still nonzero (a cancelled card being paid down) — closing a card must not require a zero balance, and a closed-but-still-owed card should keep counting toward debt totals until its balance actually reaches zero.
 
@@ -68,12 +68,12 @@ RecurringSchedule
 ├── frequency: enum { monthly, quarterly, biMonthly, annually, variable }
 ├── anchorDate: Date (the first/reference occurrence)
 └── nextDueDate: Date (computed from anchorDate + frequency, or overridden for `variable`)
-    — introduced in Phase 2 for Loan/CreditCard `Due Date` and `Cut-off` (both recur monthly), generalized in Phase 3 for Utilities/Income/Taxes. Define it here rather than inline on each entity so all six use sites (Due Date × 2, Cut-off × 2, Utility/Income/Tax schedules) share one component from the start.
+    — introduced in Phase 2 for Loan/CreditCard `Due Date`/`Cut-off` (both recur monthly), generalized in Phase 3 for Utilities/Income/Taxes. Define it here rather than inline on each entity so all seven use sites (Loan.DueDate, CreditCard.DueDate, CreditCard.CutOff, Utility.DueDate, Utility.CutOff, IncomeSource.PaySchedule, TaxFee.FeeSchedule) share one component from the start.
 
 FinancialGoal
 ├── name, targetAmount, targetDate, goalType (debtPayoff / emergencyFund / investment)
 ├── linkedAccounts: [Account] (e.g. link a goal to a specific Loan to track payoff progress)
-├── achieved: Bool, completedDate: Date? (trigger differs by `goalType`: `debtPayoff` sets it when the linked Loan's status flips to `closed`; `emergencyFund`/`investment` have no linked Loan to key off, so they need their own trigger — linked account balance reaching `targetAmount` — which isn't yet specified anywhere else in this doc and should be nailed down in Phase 5)
+├── achieved: Bool, completedDate: Date? (trigger differs by `goalType`: `debtPayoff` sets it when **every** account in `linkedAccounts` reaches `closed` status — `linkedAccounts` is an array, so a goal spanning multiple loans/cards shouldn't complete until all of them are paid off, not just the first one; `emergencyFund`/`investment` have no linked Loan to key off, so they need their own trigger — linked account balance reaching `targetAmount` — which isn't yet specified anywhere else in this doc and should be nailed down in Phase 5)
 ```
 
 **`linkedAccounts` can dangle.** Same class of problem as the linked-transaction integrity issue above: if a `Loan` (or any linked `Account`) is deleted outright rather than transitioned to `closed`, a `FinancialGoal` referencing it is left pointing at nothing. Once `status` exists (see above), steer deletion UI toward "close" for accounts with goal references, and treat outright deletion of a goal-linked account as something the repository layer actively guards against rather than allows silently.
