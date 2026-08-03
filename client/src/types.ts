@@ -1,4 +1,4 @@
-export type AccountType = "Cash" | "Bank" | "Investment" | "Loan" | "CreditCard";
+export type AccountType = "Cash" | "Bank" | "EWallet" | "Investment" | "Loan" | "CreditCard";
 export type AccountStatus = "Active" | "Closed";
 
 export interface Account {

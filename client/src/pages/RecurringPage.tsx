@@ -150,6 +150,7 @@ function UtilitiesSection({
   const [defaultAccountId, setDefaultAccountId] = useState<number | "">("");
   const [dueDateDay, setDueDateDay] = useState<number | "">("");
   const [cutOffDateDay, setCutOffDateDay] = useState<number | "">("");
+  const [policyType, setPolicyType] = useState("");
   const [schedule, setSchedule] = useState<Schedule>("Monthly");
   const [templateAmount, setTemplateAmount] = useState<number | "">("");
   const [nextRunDate, setNextRunDate] = useState("");
@@ -165,6 +166,7 @@ function UtilitiesSection({
         defaultAccountId: Number(defaultAccountId),
         dueDateDay: dueDateDay === "" ? undefined : Number(dueDateDay),
         cutOffDateDay: cutOffDateDay === "" ? undefined : Number(cutOffDateDay),
+        policyType: policyType.trim() === "" ? undefined : policyType.trim(),
         schedule,
         templateAmountMinor: toMinorUnits(templateAmount),
         nextRunDate: schedule === "Variable" ? undefined : nextRunDate,
@@ -173,6 +175,7 @@ function UtilitiesSection({
       setDefaultAccountId("");
       setDueDateDay("");
       setCutOffDateDay("");
+      setPolicyType("");
       setTemplateAmount("");
       setNextRunDate("");
       onChange();
@@ -189,6 +192,7 @@ function UtilitiesSection({
           <thead>
             <tr>
               <th>Provider</th>
+              <th>Policy type</th>
               <th>Paid from</th>
               <th>Schedule</th>
               <th className="numeric">Amount</th>
@@ -199,6 +203,7 @@ function UtilitiesSection({
             {utilities.map((u) => (
               <tr key={u.id}>
                 <td>{u.providerName}</td>
+                <td className="muted">{u.policyType ?? "—"}</td>
                 <td className="muted">{u.defaultAccountName}</td>
                 <td className="muted">{u.schedule}</td>
                 <td className="numeric">{formatMinor(u.templateAmountMinor, baseCurrency)}</td>
@@ -213,6 +218,15 @@ function UtilitiesSection({
           <label>
             Provider name
             <input type="text" value={providerName} onChange={(e) => setProviderName(e.target.value)} placeholder="e.g. Meralco" />
+          </label>
+          <label>
+            Policy type (optional)
+            <input
+              type="text"
+              value={policyType}
+              onChange={(e) => setPolicyType(e.target.value)}
+              placeholder="e.g. Life, Health, Auto — leave blank for non-insurance"
+            />
           </label>
           <label>
             Paid from

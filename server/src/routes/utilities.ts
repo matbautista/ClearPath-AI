@@ -26,6 +26,7 @@ utilitiesRouter.get("/", (_req, res) => {
       defaultAccountName: r.default_account_name,
       cutOffDateDay: r.cut_off_date_day,
       dueDateDay: r.due_date_day,
+      policyType: r.policy_type,
       recurringRuleId: r.rule_id,
       schedule: r.schedule,
       templateAmountMinor: r.template_amount_minor,
@@ -44,6 +45,7 @@ utilitiesRouter.post("/", (req, res) => {
     defaultAccountId,
     cutOffDateDay,
     dueDateDay,
+    policyType,
     schedule,
     templateAmountMinor,
     nextRunDate,
@@ -69,8 +71,8 @@ utilitiesRouter.post("/", (req, res) => {
   try {
     const uInfo = db
       .prepare(
-        `INSERT INTO utilities (provider_name, description, service_account_number, service_account_name, default_account_id, cut_off_date_day, due_date_day)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`
+        `INSERT INTO utilities (provider_name, description, service_account_number, service_account_name, default_account_id, cut_off_date_day, due_date_day, policy_type)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .run(
         String(providerName).trim(),
@@ -79,7 +81,8 @@ utilitiesRouter.post("/", (req, res) => {
         serviceAccountName ?? null,
         defaultAccountId,
         cutOffDateDay ?? null,
-        dueDateDay ?? null
+        dueDateDay ?? null,
+        policyType && String(policyType).trim() ? String(policyType).trim() : null
       );
     const utilityId = Number(uInfo.lastInsertRowid);
 

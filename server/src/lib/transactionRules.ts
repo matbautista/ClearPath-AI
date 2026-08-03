@@ -5,7 +5,7 @@
 // which direction (Debit/Credit) each leg moves in, and what category
 // kind (spending / income / none) applies.
 
-export type AccountType = "Cash" | "Bank" | "Investment" | "Loan" | "CreditCard";
+export type AccountType = "Cash" | "Bank" | "EWallet" | "Investment" | "Loan" | "CreditCard";
 export type Indicator = "Debit" | "Credit";
 export type CategoryKind = "spending" | "income" | "none";
 
@@ -49,31 +49,34 @@ export type TxnRule = SingleLegRule | TwoLegRule;
 
 export const TXN_RULES: Record<TxnType, TxnRule> = {
   // --- Single-leg external outflows (Debit, Spending Category) ---
-  BillsPayment: { legs: "single", accountTypes: ["Cash", "Bank"], indicator: "Debit", categoryKind: "spending" },
+  BillsPayment: { legs: "single", accountTypes: ["Cash", "Bank", "EWallet"], indicator: "Debit", categoryKind: "spending" },
   CashPayment: { legs: "single", accountTypes: ["Cash"], indicator: "Debit", categoryKind: "spending" },
-  eCashPayment: { legs: "single", accountTypes: ["Bank"], indicator: "Debit", categoryKind: "spending" },
+  eCashPayment: { legs: "single", accountTypes: ["Bank", "EWallet"], indicator: "Debit", categoryKind: "spending" },
   CardPurchase: { legs: "single", accountTypes: ["CreditCard"], indicator: "Debit", categoryKind: "spending" },
 
   // --- Single-leg external inflows (Credit, Income Category) ---
+  // CheckDeposit/DividendInterestReceived deliberately exclude EWallet —
+  // depositing a physical check or receiving investment dividends isn't
+  // an e-wallet operation, unlike every other Bank-eligible type here.
   CheckDeposit: { legs: "single", accountTypes: ["Cash", "Bank"], indicator: "Credit", categoryKind: "income" },
   DividendInterestReceived: { legs: "single", accountTypes: ["Bank", "Investment"], indicator: "Credit", categoryKind: "income" },
-  IncomeReceived: { legs: "single", accountTypes: ["Cash", "Bank"], indicator: "Credit", categoryKind: "income" },
+  IncomeReceived: { legs: "single", accountTypes: ["Cash", "Bank", "EWallet"], indicator: "Credit", categoryKind: "income" },
 
   // --- Two-leg, Internal Transfer family (category user-overridable) ---
   CashWithdrawal: {
-    legs: "two", sourceAccountTypes: ["Bank"], destAccountTypes: ["Cash"],
+    legs: "two", sourceAccountTypes: ["Bank", "EWallet"], destAccountTypes: ["Cash"],
     sourceIndicator: "Debit", destIndicator: "Credit",
     categoryKind: "spending", defaultCategoryName: "Internal Transfer", categoryOverridable: true,
     requiresPrincipalInterestSplit: false,
   },
   CashDeposit: {
-    legs: "two", sourceAccountTypes: ["Cash"], destAccountTypes: ["Bank"],
+    legs: "two", sourceAccountTypes: ["Cash"], destAccountTypes: ["Bank", "EWallet"],
     sourceIndicator: "Debit", destIndicator: "Credit",
     categoryKind: "spending", defaultCategoryName: "Internal Transfer", categoryOverridable: true,
     requiresPrincipalInterestSplit: false,
   },
   eCashTransfer: {
-    legs: "two", sourceAccountTypes: ["Bank"], destAccountTypes: ["Bank"],
+    legs: "two", sourceAccountTypes: ["Bank", "EWallet"], destAccountTypes: ["Bank", "EWallet"],
     sourceIndicator: "Debit", destIndicator: "Credit",
     categoryKind: "spending", defaultCategoryName: "Internal Transfer", categoryOverridable: true,
     requiresPrincipalInterestSplit: false,
@@ -81,13 +84,13 @@ export const TXN_RULES: Record<TxnType, TxnRule> = {
 
   // --- Two-leg, fixed category, debt-related (Principal/Interest split) ---
   CardPayment: {
-    legs: "two", sourceAccountTypes: ["Cash", "Bank"], destAccountTypes: ["CreditCard"],
+    legs: "two", sourceAccountTypes: ["Cash", "Bank", "EWallet"], destAccountTypes: ["CreditCard"],
     sourceIndicator: "Debit", destIndicator: "Credit",
     categoryKind: "spending", defaultCategoryName: "Debt Payment", categoryOverridable: false,
     requiresPrincipalInterestSplit: true,
   },
   LoanPayment: {
-    legs: "two", sourceAccountTypes: ["Cash", "Bank"], destAccountTypes: ["Loan"],
+    legs: "two", sourceAccountTypes: ["Cash", "Bank", "EWallet"], destAccountTypes: ["Loan"],
     sourceIndicator: "Debit", destIndicator: "Credit",
     categoryKind: "spending", defaultCategoryName: "Debt Payment", categoryOverridable: false,
     requiresPrincipalInterestSplit: true,
@@ -95,7 +98,7 @@ export const TXN_RULES: Record<TxnType, TxnRule> = {
 
   // --- Two-leg, no category (borrowed principal is neither spending nor income) ---
   LoanDisbursement: {
-    legs: "two", sourceAccountTypes: ["Loan"], destAccountTypes: ["Cash", "Bank"],
+    legs: "two", sourceAccountTypes: ["Loan"], destAccountTypes: ["Cash", "Bank", "EWallet"],
     sourceIndicator: "Debit", destIndicator: "Credit",
     categoryKind: "none", defaultCategoryName: null, categoryOverridable: false,
     requiresPrincipalInterestSplit: false,
@@ -103,13 +106,13 @@ export const TXN_RULES: Record<TxnType, TxnRule> = {
 
   // --- Two-leg, fixed category, investment-related ---
   InvestmentBuy: {
-    legs: "two", sourceAccountTypes: ["Cash", "Bank"], destAccountTypes: ["Investment"],
+    legs: "two", sourceAccountTypes: ["Cash", "Bank", "EWallet"], destAccountTypes: ["Investment"],
     sourceIndicator: "Debit", destIndicator: "Credit",
     categoryKind: "spending", defaultCategoryName: "Savings/Investment Transfer", categoryOverridable: false,
     requiresPrincipalInterestSplit: false,
   },
   InvestmentSell: {
-    legs: "two", sourceAccountTypes: ["Investment"], destAccountTypes: ["Cash", "Bank"],
+    legs: "two", sourceAccountTypes: ["Investment"], destAccountTypes: ["Cash", "Bank", "EWallet"],
     sourceIndicator: "Debit", destIndicator: "Credit",
     categoryKind: "spending", defaultCategoryName: "Savings/Investment Transfer", categoryOverridable: false,
     requiresPrincipalInterestSplit: false,

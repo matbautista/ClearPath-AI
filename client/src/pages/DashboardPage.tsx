@@ -94,6 +94,7 @@ export function DashboardPage() {
       <div className="stat-tile-row">
         <StatTile label="Cash on Hand" valueMinor={summary.cashOnHandMinor} currency={baseCurrency} />
         <StatTile label="Cash in Bank" valueMinor={summary.totalCashInBankMinor} currency={baseCurrency} />
+        <StatTile label="E-Wallets" valueMinor={summary.totalEWalletMinor} currency={baseCurrency} />
         <StatTile label="Investments" valueMinor={summary.totalInvestmentValueMinor} currency={baseCurrency} />
         <StatTile label="Loan Balance" valueMinor={summary.totalLoanBalanceMinor} currency={baseCurrency} />
         <StatTile label="Card Balance" valueMinor={summary.totalCardBalanceMinor} currency={baseCurrency} />

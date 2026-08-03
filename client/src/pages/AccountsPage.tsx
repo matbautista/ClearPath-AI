@@ -4,11 +4,12 @@ import { formatMinor, toMinorUnits } from "../lib/money";
 import { useSettings } from "../SettingsContext";
 import type { Account, AccountType, NewAccountInput } from "../types";
 
-const ACCOUNT_TYPES: AccountType[] = ["Cash", "Bank", "Investment", "Loan", "CreditCard"];
+const ACCOUNT_TYPES: AccountType[] = ["Cash", "Bank", "EWallet", "Investment", "Loan", "CreditCard"];
 
 const TYPE_LABELS: Record<AccountType, string> = {
   Cash: "Cash",
   Bank: "Bank",
+  EWallet: "E-Wallet",
   Investment: "Investment",
   Loan: "Loan",
   CreditCard: "Credit Card",
@@ -139,7 +140,7 @@ export function AccountsPage() {
                 type="text"
                 value={form.accountName ?? ""}
                 onChange={(e) => setForm({ ...form, accountName: e.target.value })}
-                placeholder={form.accountType === "Cash" ? "e.g. Wallet" : "e.g. BPI Savings"}
+                placeholder={form.accountType === "Cash" ? "e.g. Wallet" : form.accountType === "EWallet" ? "e.g. GCash" : "e.g. BPI Savings"}
               />
             </label>
             {form.accountType !== "Cash" && (

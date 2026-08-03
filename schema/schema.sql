@@ -108,7 +108,7 @@ CREATE TABLE settings (
 -- =========================================================================
 CREATE TABLE accounts (
     id                       INTEGER PRIMARY KEY,
-    account_type             TEXT NOT NULL CHECK (account_type IN ('Cash','Bank','Investment','Loan','CreditCard')),
+    account_type             TEXT NOT NULL CHECK (account_type IN ('Cash','Bank','EWallet','Investment','Loan','CreditCard')),
     institution_name         TEXT,                          -- blank for Cash
     description              TEXT,
     account_number_encrypted BLOB,
@@ -248,6 +248,7 @@ CREATE TABLE utilities (
     default_account_id       INTEGER NOT NULL REFERENCES accounts(id), -- GAP FIX #1 above: needed so auto-drafts (2.7) know a source account
     cut_off_date_day         INTEGER CHECK (cut_off_date_day BETWEEN 1 AND 31),
     due_date_day             INTEGER CHECK (due_date_day BETWEEN 1 AND 31),
+    policy_type              TEXT,                          -- freeform, e.g. 'Life', 'Health', 'Auto' — only meaningful for insurance-type Utilities; NULL for electricity/water/etc.
     created_at                TEXT NOT NULL DEFAULT (datetime('now'))
 );
 

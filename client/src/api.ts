@@ -173,6 +173,7 @@ export interface Utility {
   defaultAccountName: string;
   cutOffDateDay: number | null;
   dueDateDay: number | null;
+  policyType: string | null;
   recurringRuleId: number;
   schedule: Schedule;
   templateAmountMinor: number;
@@ -188,6 +189,7 @@ export interface NewUtilityInput {
   defaultAccountId: number;
   cutOffDateDay?: number;
   dueDateDay?: number;
+  policyType?: string;
   schedule: Schedule;
   templateAmountMinor: number;
   nextRunDate?: string;
@@ -254,6 +256,7 @@ export interface UpcomingDue {
 export interface DashboardSummary {
   cashOnHandMinor: number;
   totalCashInBankMinor: number;
+  totalEWalletMinor: number;
   totalInvestmentValueMinor: number;
   totalLoanBalanceMinor: number;
   totalCardBalanceMinor: number;

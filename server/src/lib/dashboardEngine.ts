@@ -11,7 +11,7 @@ export function computeAccountTypeTotals(): Record<string, number> {
        FROM accounts WHERE status = 'Active' GROUP BY account_type`
     )
     .all() as { account_type: string; total: number }[];
-  const totals: Record<string, number> = { Cash: 0, Bank: 0, Investment: 0, Loan: 0, CreditCard: 0 };
+  const totals: Record<string, number> = { Cash: 0, Bank: 0, EWallet: 0, Investment: 0, Loan: 0, CreditCard: 0 };
   for (const r of rows) totals[r.account_type] = r.total;
   return totals;
 }
