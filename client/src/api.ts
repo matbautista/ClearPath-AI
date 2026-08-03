@@ -244,6 +244,39 @@ export interface NewTaxFeeInput {
   reminderLeadTimeDays?: number;
 }
 
+export interface UpcomingDue {
+  label: string;
+  dueDate: string;
+  amountMinor: number;
+  source: "Loan" | "CreditCard" | "Utility" | "TaxFee";
+}
+
+export interface DashboardSummary {
+  cashOnHandMinor: number;
+  totalCashInBankMinor: number;
+  totalInvestmentValueMinor: number;
+  totalLoanBalanceMinor: number;
+  totalCardBalanceMinor: number;
+  totalAssetsMinor: number;
+  totalLiabilitiesMinor: number;
+  netWorthMinor: number;
+  upcomingDues: UpcomingDue[];
+}
+
+export interface NetWorthTrendPoint {
+  date: string;
+  totalAssetsMinor: number;
+  totalLiabilitiesMinor: number;
+  netWorthMinor: number;
+}
+
+export interface SavingsRateResult {
+  periodDays: number;
+  incomeMinor: number;
+  expenseMinor: number;
+  rate: number | null;
+}
+
 export interface PendingTransaction {
   id: number;
   txnDate: string;
@@ -297,4 +330,9 @@ export const api = {
     post(`/api/recurring/pending/${id}/confirm`, amountMinor != null ? { amountMinor } : {}),
   skipPending: (id: number): Promise<{ ok: true }> => post(`/api/recurring/pending/${id}/skip`),
   runDueRecurring: (): Promise<{ generated: number }> => post("/api/recurring/run-due"),
+
+  // dashboard
+  dashboardSummary: (): Promise<DashboardSummary> => get("/api/dashboard/summary"),
+  netWorthTrend: (days = 90): Promise<NetWorthTrendPoint[]> => get(`/api/dashboard/net-worth-trend?days=${days}`),
+  savingsRate: (days = 30): Promise<SavingsRateResult> => get(`/api/dashboard/savings-rate?days=${days}`),
 };

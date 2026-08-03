@@ -3,18 +3,19 @@ import { api, ApiError, setUnauthorizedHandler, type Settings } from "./api";
 import { SettingsContext } from "./SettingsContext";
 import { SetupPage } from "./pages/SetupPage";
 import { LoginPage } from "./pages/LoginPage";
+import { DashboardPage } from "./pages/DashboardPage";
 import { AccountsPage } from "./pages/AccountsPage";
 import { TransactionsPage } from "./pages/TransactionsPage";
 import { GoalsPage } from "./pages/GoalsPage";
 import { RecurringPage } from "./pages/RecurringPage";
 
 type Phase = "loading" | "setup" | "login" | "app";
-type Page = "accounts" | "transactions" | "goals" | "recurring";
+type Page = "dashboard" | "accounts" | "transactions" | "goals" | "recurring";
 
 function App() {
   const [phase, setPhase] = useState<Phase>("loading");
   const [settings, setSettings] = useState<Settings | null>(null);
-  const [page, setPage] = useState<Page>("accounts");
+  const [page, setPage] = useState<Page>("dashboard");
 
   async function resolveAuthState() {
     const { configured } = await api.settingsStatus();
@@ -68,6 +69,9 @@ function App() {
       <nav className="app-nav">
         <span className="app-brand">ClearPath AI</span>
         <div className="app-nav-links">
+          <button className={page === "dashboard" ? "nav-active" : "nav-link"} onClick={() => setPage("dashboard")}>
+            Dashboard
+          </button>
           <button className={page === "accounts" ? "nav-active" : "nav-link"} onClick={() => setPage("accounts")}>
             Accounts
           </button>
@@ -85,6 +89,7 @@ function App() {
           Log out
         </button>
       </nav>
+      {page === "dashboard" && <DashboardPage />}
       {page === "accounts" && <AccountsPage />}
       {page === "transactions" && <TransactionsPage />}
       {page === "goals" && <GoalsPage />}
