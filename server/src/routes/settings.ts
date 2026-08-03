@@ -1,7 +1,8 @@
 import { Router } from "express";
 import { db } from "../db.js";
 import { hashPassphrase, verifyPassphrase } from "../lib/passphrase.js";
-import { createSession, destroySession, SESSION_COOKIE } from "../lib/session.js";
+import { createSession, destroySession, SESSION_COOKIE, requireAuth } from "../lib/session.js";
+import { encrypt } from "../lib/encryption.js";
 
 export const settingsRouter = Router();
 
@@ -82,7 +83,7 @@ settingsRouter.post("/logout", (req, res) => {
 
 // Authenticated — non-secret fields only. Never returns
 // auth_passphrase_hash, ai_api_key_encrypted, or smtp_password_encrypted.
-settingsRouter.get("/me", (_req, res) => {
+settingsRouter.get("/me", requireAuth, (_req, res) => {
   const row = getSettingsRow();
   if (!row) return res.status(404).json({ errors: ["Not set up yet."] });
   res.json({
@@ -99,3 +100,62 @@ settingsRouter.get("/me", (_req, res) => {
     defaultReminderLeadTimeDays: row.default_reminder_lead_time_days,
   });
 });
+
+// AI Analysis configuration (3.11): explicit opt-in toggle, provider
+// choice, BYOK API key (encrypted at rest — never echoed back), and the
+// scheduled-auto-run opt-in. aiApiKey is write-only: omit it to leave the
+// stored key untouched, send "" to clear it.
+settingsRouter.patch("/ai", requireAuth, (req, res) => {
+  const row = getSettingsRow();
+  if (!row) return res.status(404).json({ errors: ["Not set up yet."] });
+
+  const { aiAnalysisEnabled, aiProvider, aiApiKey, aiScheduledAutoRun } = req.body as {
+    aiAnalysisEnabled?: boolean;
+    aiProvider?: string;
+    aiApiKey?: string;
+    aiScheduledAutoRun?: boolean;
+  };
+
+  const errors: string[] = [];
+  if (aiProvider !== undefined && aiProvider !== "Anthropic") {
+    errors.push("Only the Anthropic provider is currently supported.");
+  }
+  if (aiAnalysisEnabled === true) {
+    const willHaveProvider = aiProvider ?? row.ai_provider;
+    const willHaveKey = aiApiKey !== undefined ? aiApiKey.length > 0 : hasStoredApiKey();
+    if (!willHaveProvider) errors.push("Choose an AI provider before enabling AI Analysis.");
+    if (!willHaveKey) errors.push("Add an API key before enabling AI Analysis.");
+  }
+  if (errors.length > 0) return res.status(422).json({ errors });
+
+  const sets: string[] = [];
+  const values: unknown[] = [];
+  if (aiAnalysisEnabled !== undefined) {
+    sets.push("ai_analysis_enabled = ?");
+    values.push(aiAnalysisEnabled ? 1 : 0);
+  }
+  if (aiProvider !== undefined) {
+    sets.push("ai_provider = ?");
+    values.push(aiProvider);
+  }
+  if (aiApiKey !== undefined) {
+    sets.push("ai_api_key_encrypted = ?");
+    values.push(aiApiKey === "" ? null : encrypt(aiApiKey));
+  }
+  if (aiScheduledAutoRun !== undefined) {
+    sets.push("ai_scheduled_auto_run = ?");
+    values.push(aiScheduledAutoRun ? 1 : 0);
+  }
+  if (sets.length === 0) return res.status(422).json({ errors: ["No fields provided."] });
+
+  sets.push("updated_at = datetime('now')");
+  db.prepare(`UPDATE settings SET ${sets.join(", ")} WHERE id = 1`).run(...(values as any[]));
+  res.json({ ok: true });
+});
+
+function hasStoredApiKey(): boolean {
+  const row = db.prepare("SELECT ai_api_key_encrypted FROM settings WHERE id = 1").get() as
+    | { ai_api_key_encrypted: Uint8Array | null }
+    | undefined;
+  return !!row?.ai_api_key_encrypted;
+}

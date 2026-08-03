@@ -289,6 +289,21 @@ export interface MoneyPitFlag {
   dismissedAt: string | null;
 }
 
+export interface AiAnalysisRun {
+  id: number;
+  ranAt: string;
+  status: "Success" | "Failed";
+  outputText: string | null;
+  errorMessage: string | null;
+}
+
+export interface UpdateAiSettingsInput {
+  aiAnalysisEnabled?: boolean;
+  aiProvider?: string;
+  aiApiKey?: string;
+  aiScheduledAutoRun?: boolean;
+}
+
 export interface PendingTransaction {
   id: number;
   txnDate: string;
@@ -309,6 +324,11 @@ export const api = {
   login: (passphrase: string): Promise<{ ok: true }> => post("/api/settings/login", { passphrase }),
   logout: (): Promise<{ ok: true }> => post("/api/settings/logout"),
   me: (): Promise<Settings> => get("/api/settings/me"),
+  updateAiSettings: (input: UpdateAiSettingsInput): Promise<{ ok: true }> => patch("/api/settings/ai", input),
+
+  // AI Analysis (3.11)
+  runAiAnalysis: (): Promise<{ outputText: string }> => post("/api/ai-analysis/run"),
+  listAiRuns: (): Promise<AiAnalysisRun[]> => get("/api/ai-analysis/runs"),
 
   // accounts
   listAccounts: (): Promise<Account[]> => get("/api/accounts"),

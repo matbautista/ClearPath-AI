@@ -13,6 +13,7 @@ import { taxFeesRouter } from "./routes/taxFees.js";
 import { recurringRouter } from "./routes/recurring.js";
 import { dashboardRouter } from "./routes/dashboard.js";
 import { moneyPitsRouter } from "./routes/moneyPits.js";
+import { aiAnalysisRouter } from "./routes/aiAnalysis.js";
 import { requireAuth } from "./lib/session.js";
 import { runDueRecurringRules } from "./lib/recurringEngine.js";
 import { backfillSnapshots } from "./lib/netWorthEngine.js";
@@ -39,6 +40,7 @@ app.use("/api/tax-fees", requireAuth, taxFeesRouter);
 app.use("/api/recurring", requireAuth, recurringRouter);
 app.use("/api/dashboard", requireAuth, dashboardRouter);
 app.use("/api/money-pits", requireAuth, moneyPitsRouter);
+app.use("/api/ai-analysis", requireAuth, aiAnalysisRouter);
 
 const PORT = process.env.PORT ? Number(process.env.PORT) : 4000;
 app.listen(PORT, () => {

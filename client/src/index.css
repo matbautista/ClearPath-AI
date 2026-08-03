@@ -197,6 +197,26 @@ tr.txn-voided td {
   text-decoration: line-through;
 }
 
+.status-success {
+  background: var(--status-active-bg);
+  color: var(--status-active-text);
+}
+
+.status-failed {
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
+.ai-output {
+  white-space: pre-wrap;
+  font-family: inherit;
+  background: var(--surface-2, transparent);
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 8px;
+  padding: 12px 16px;
+  line-height: 1.5;
+}
+
 tr.txn-voided td:last-child, tr.txn-voided td:nth-last-child(2) {
   text-decoration: none;
 }

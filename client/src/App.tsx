@@ -8,9 +8,11 @@ import { AccountsPage } from "./pages/AccountsPage";
 import { TransactionsPage } from "./pages/TransactionsPage";
 import { GoalsPage } from "./pages/GoalsPage";
 import { RecurringPage } from "./pages/RecurringPage";
+import { AiAssistPage } from "./pages/AiAssistPage";
+import { SettingsPage } from "./pages/SettingsPage";
 
 type Phase = "loading" | "setup" | "login" | "app";
-type Page = "dashboard" | "accounts" | "transactions" | "goals" | "recurring";
+type Page = "dashboard" | "accounts" | "transactions" | "goals" | "recurring" | "ai-assist" | "settings";
 
 function App() {
   const [phase, setPhase] = useState<Phase>("loading");
@@ -84,7 +86,13 @@ function App() {
           <button className={page === "recurring" ? "nav-active" : "nav-link"} onClick={() => setPage("recurring")}>
             Recurring
           </button>
+          <button className={page === "ai-assist" ? "nav-active" : "nav-link"} onClick={() => setPage("ai-assist")}>
+            AI Assist
+          </button>
         </div>
+        <button className={page === "settings" ? "nav-active" : "nav-link"} onClick={() => setPage("settings")}>
+          Settings
+        </button>
         <button className="nav-link" onClick={handleLogout}>
           Log out
         </button>
@@ -94,6 +102,8 @@ function App() {
       {page === "transactions" && <TransactionsPage />}
       {page === "goals" && <GoalsPage />}
       {page === "recurring" && <RecurringPage />}
+      {page === "ai-assist" && <AiAssistPage />}
+      {page === "settings" && <SettingsPage />}
     </SettingsContext.Provider>
   );
 }
