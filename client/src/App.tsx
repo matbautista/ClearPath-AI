@@ -6,9 +6,10 @@ import { LoginPage } from "./pages/LoginPage";
 import { AccountsPage } from "./pages/AccountsPage";
 import { TransactionsPage } from "./pages/TransactionsPage";
 import { GoalsPage } from "./pages/GoalsPage";
+import { RecurringPage } from "./pages/RecurringPage";
 
 type Phase = "loading" | "setup" | "login" | "app";
-type Page = "accounts" | "transactions" | "goals";
+type Page = "accounts" | "transactions" | "goals" | "recurring";
 
 function App() {
   const [phase, setPhase] = useState<Phase>("loading");
@@ -76,6 +77,9 @@ function App() {
           <button className={page === "goals" ? "nav-active" : "nav-link"} onClick={() => setPage("goals")}>
             Goals
           </button>
+          <button className={page === "recurring" ? "nav-active" : "nav-link"} onClick={() => setPage("recurring")}>
+            Recurring
+          </button>
         </div>
         <button className="nav-link" onClick={handleLogout}>
           Log out
@@ -84,6 +88,7 @@ function App() {
       {page === "accounts" && <AccountsPage />}
       {page === "transactions" && <TransactionsPage />}
       {page === "goals" && <GoalsPage />}
+      {page === "recurring" && <RecurringPage />}
     </SettingsContext.Provider>
   );
 }

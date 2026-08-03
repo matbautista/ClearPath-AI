@@ -425,3 +425,14 @@ button.secondary:hover:not(:disabled) {
   padding: 6px 12px;
   font-size: 0.85rem;
 }
+
+/* --- Recurring / Pending confirmations --- */
+.pending-panel {
+  border-color: var(--accent);
+  border-width: 1.5px;
+}
+
+.pending-panel table button {
+  padding: 4px 10px;
+  font-size: 0.8rem;
+}

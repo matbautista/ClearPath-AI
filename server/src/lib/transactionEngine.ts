@@ -23,13 +23,13 @@ export interface PostTransactionInput {
   interestPortionMinor?: number;
 }
 
-interface AccountRow {
+export interface AccountRow {
   id: number;
   account_type: AccountType;
   status: string;
 }
 
-function getAccount(id: number): AccountRow | undefined {
+export function getAccount(id: number): AccountRow | undefined {
   return db.prepare("SELECT id, account_type, status FROM accounts WHERE id = ?").get(id) as AccountRow | undefined;
 }
 
@@ -62,7 +62,7 @@ function ledgerAmount(opts: {
   return opts.amountMinor + opts.additionalFeesMinor;
 }
 
-function applyBalanceDelta(account: AccountRow, indicator: "Debit" | "Credit", ledgerAmt: number) {
+export function applyBalanceDelta(account: AccountRow, indicator: "Debit" | "Credit", ledgerAmt: number) {
   const isLiability = account.account_type === "Loan" || account.account_type === "CreditCard";
   // Assets: Credit = balance up, Debit = balance down.
   // Liabilities: Debit = amount owed up, Credit = amount owed down.

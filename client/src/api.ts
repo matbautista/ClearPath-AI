@@ -161,6 +161,101 @@ export interface NewGoalLinkInput {
   allocationValue: number;
 }
 
+export type Schedule = "Annually" | "Quarterly" | "Monthly" | "Bi-Monthly" | "Variable";
+
+export interface Utility {
+  id: number;
+  providerName: string;
+  description: string | null;
+  serviceAccountNumber: string | null;
+  serviceAccountName: string | null;
+  defaultAccountId: number;
+  defaultAccountName: string;
+  cutOffDateDay: number | null;
+  dueDateDay: number | null;
+  recurringRuleId: number;
+  schedule: Schedule;
+  templateAmountMinor: number;
+  nextRunDate: string | null;
+  reminderLeadTimeDays: number | null;
+}
+
+export interface NewUtilityInput {
+  providerName: string;
+  description?: string;
+  serviceAccountNumber?: string;
+  serviceAccountName?: string;
+  defaultAccountId: number;
+  cutOffDateDay?: number;
+  dueDateDay?: number;
+  schedule: Schedule;
+  templateAmountMinor: number;
+  nextRunDate?: string;
+  reminderLeadTimeDays?: number;
+}
+
+export interface IncomeSource {
+  id: number;
+  sourceName: string;
+  description: string | null;
+  incomeCategory: string;
+  creditToAccountId: number;
+  creditToAccountName: string;
+  recurringRuleId: number;
+  schedule: Schedule;
+  templateAmountMinor: number;
+  nextRunDate: string | null;
+  reminderLeadTimeDays: number | null;
+}
+
+export interface NewIncomeSourceInput {
+  sourceName: string;
+  description?: string;
+  incomeCategory: string;
+  creditToAccountId: number;
+  schedule: Schedule;
+  templateAmountMinor: number;
+  nextRunDate?: string;
+  reminderLeadTimeDays?: number;
+}
+
+export interface TaxFee {
+  id: number;
+  regulatoryName: string;
+  description: string | null;
+  feeCategory: string | null;
+  debitFromAccountId: number;
+  debitFromAccountName: string;
+  recurringRuleId: number;
+  schedule: Schedule;
+  templateAmountMinor: number;
+  nextRunDate: string | null;
+  reminderLeadTimeDays: number | null;
+}
+
+export interface NewTaxFeeInput {
+  regulatoryName: string;
+  description?: string;
+  feeCategory?: string;
+  debitFromAccountId: number;
+  schedule: Schedule;
+  templateAmountMinor: number;
+  nextRunDate?: string;
+  reminderLeadTimeDays?: number;
+}
+
+export interface PendingTransaction {
+  id: number;
+  txnDate: string;
+  amountMinor: number;
+  indicator: "Debit" | "Credit";
+  sourceAccountId: number;
+  sourceAccountName: string;
+  txnType: string;
+  spendingCategoryName: string | null;
+  incomeCategory: string | null;
+}
+
 export const api = {
   // auth / settings
   settingsStatus: (): Promise<SettingsStatus> => get("/api/settings/status"),
@@ -189,4 +284,17 @@ export const api = {
   createGoal: (input: NewGoalInput): Promise<Goal> => post("/api/goals", input),
   addGoalLink: (goalId: number, input: NewGoalLinkInput): Promise<Goal> => post(`/api/goals/${goalId}/links`, input),
   abandonGoal: (goalId: number): Promise<Goal> => patch(`/api/goals/${goalId}`, { status: "Abandoned" }),
+
+  // recurring: utilities / income sources / tax fees / pending confirmations
+  listUtilities: (): Promise<Utility[]> => get("/api/utilities"),
+  createUtility: (input: NewUtilityInput): Promise<{ id: number }> => post("/api/utilities", input),
+  listIncomeSources: (): Promise<IncomeSource[]> => get("/api/income-sources"),
+  createIncomeSource: (input: NewIncomeSourceInput): Promise<{ id: number }> => post("/api/income-sources", input),
+  listTaxFees: (): Promise<TaxFee[]> => get("/api/tax-fees"),
+  createTaxFee: (input: NewTaxFeeInput): Promise<{ id: number }> => post("/api/tax-fees", input),
+  listPending: (): Promise<PendingTransaction[]> => get("/api/recurring/pending"),
+  confirmPending: (id: number, amountMinor?: number): Promise<{ ok: true }> =>
+    post(`/api/recurring/pending/${id}/confirm`, amountMinor != null ? { amountMinor } : {}),
+  skipPending: (id: number): Promise<{ ok: true }> => post(`/api/recurring/pending/${id}/skip`),
+  runDueRecurring: (): Promise<{ generated: number }> => post("/api/recurring/run-due"),
 };
