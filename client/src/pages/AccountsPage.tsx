@@ -52,6 +52,7 @@ export function AccountsPage() {
       accountType: a.accountType,
       accountName: a.accountName,
       institutionName: a.institutionName ?? undefined,
+      beginningBalanceMinor: a.beginningBalanceMinor,
       interestRatePct: a.interestRatePct ?? undefined,
       creditLimitMinor: a.creditLimitMinor ?? undefined,
       loanAmountMinor: a.loanAmountMinor ?? undefined,
@@ -74,6 +75,7 @@ export function AccountsPage() {
         await api.updateAccount(editingId, {
           accountName: form.accountName,
           institutionName: form.institutionName,
+          beginningBalanceMinor: form.beginningBalanceMinor,
           interestRatePct: form.interestRatePct,
           creditLimitMinor: form.creditLimitMinor,
           loanAmountMinor: form.loanAmountMinor,
@@ -108,6 +110,8 @@ export function AccountsPage() {
   const isCreditCard = form.accountType === "CreditCard";
   const isLoan = form.accountType === "Loan";
   const isLoanOrCard = isLoan || isCreditCard;
+  const editingAccount = editingId != null ? accounts.find((a) => a.id === editingId) ?? null : null;
+  const balanceIsCorrectable = editingId == null || editingAccount?.hasTransactions === false;
 
   return (
     <div className="page">
@@ -210,7 +214,7 @@ export function AccountsPage() {
           </div>
 
           <div className="field-row">
-            {editingId == null && (
+            {balanceIsCorrectable && (
               <label>
                 {isCreditCard ? "Current balance owed" : "Beginning balance"}
                 <input
@@ -281,10 +285,12 @@ export function AccountsPage() {
 
           {editingId != null && (
             <p className="muted">
-              Type and Beginning Balance can't be changed here — Beginning Balance only seeds the
-              starting balance once at setup, and the account's current balance is built from its
-              transaction history from then on. Status can be changed above (e.g. to close the
-              account).
+              Type can't be changed here — a different account type supports different
+              transactions, so it would invalidate any history already posted against this
+              account. {balanceIsCorrectable
+                ? "This account has no transactions yet, so its starting balance above is still safe to correct."
+                : "Its starting balance can no longer be corrected here either, since the current balance is now built from posted transaction history — record a correcting transaction instead."}{" "}
+              Status can be changed above (e.g. to close the account).
             </p>
           )}
 

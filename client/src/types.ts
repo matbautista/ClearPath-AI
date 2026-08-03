@@ -8,6 +8,7 @@ export interface Account {
   description: string | null;
   accountName: string;
   beginningBalanceMinor: number;
+  hasTransactions: boolean;
   currentBalanceMinor: number | null; // null for CreditCard
   cardBalanceMinor: number | null; // null for non-CreditCard
   availableBalanceMinor: number | null; // CreditCard only, derived
@@ -40,11 +41,14 @@ export interface NewAccountInput {
   cutOffDateDay?: number;
 }
 
-// Account Type and Beginning Balance aren't included — see the PATCH
-// handler in server/src/routes/accounts.ts for why they're not editable.
+// Account Type isn't included — never editable, see the PATCH handler in
+// server/src/routes/accounts.ts. Beginning Balance IS included but only
+// takes effect server-side if the account has zero posted transactions —
+// same file, same comment.
 export interface EditAccountInput {
   accountName: string;
   institutionName?: string;
+  beginningBalanceMinor?: number;
   interestRatePct?: number;
   creditLimitMinor?: number;
   loanAmountMinor?: number;

@@ -27,6 +27,16 @@ interface AccountRow {
   updated_at: string;
 }
 
+// Whether any transaction has ever posted against this account — the
+// PATCH handler below uses this to decide whether Beginning Balance is
+// still safely correctable (see its comment for why).
+function accountHasTransactions(accountId: number): boolean {
+  const row = db.prepare("SELECT COUNT(*) AS cnt FROM transactions WHERE source_account_id = ?").get(accountId) as {
+    cnt: number;
+  };
+  return row.cnt > 0;
+}
+
 // Maps a DB row to the API shape — computes Available Balance on read
 // per 2.1/2.4b ("derived, not stored": Credit Limit - Card Balance).
 function toApiShape(row: AccountRow) {
@@ -37,6 +47,7 @@ function toApiShape(row: AccountRow) {
     description: row.description,
     accountName: row.account_name,
     beginningBalanceMinor: row.beginning_balance_minor,
+    hasTransactions: accountHasTransactions(row.id),
     currentBalanceMinor: row.account_type === "CreditCard" ? null : row.current_balance_minor,
     cardBalanceMinor: row.account_type === "CreditCard" ? row.card_balance_minor : null,
     availableBalanceMinor:
@@ -126,17 +137,22 @@ accountsRouter.post("/", (req, res) => {
   }
 });
 
-// PATCH /api/accounts/:id — edit an existing account. Account Type and
-// Beginning Balance are deliberately not editable here: Beginning Balance
-// only seeds Current/Card Balance once at creation (2.1) and is never
-// revisited afterward (transactionEngine.ts increments the balance columns
-// in place per transaction, it doesn't re-derive them from Beginning
-// Balance + history), so changing it later would desync the stored balance
-// from its own transaction history. Changing Account Type would invalidate
-// every transaction and TXN_RULES check (2.3) already posted against the
-// original type. Status has no such hazard — closing an account has no
-// balance-zero requirement (2.1) — so it's editable here alongside the
-// same cosmetic/metadata fields exposed on create.
+// PATCH /api/accounts/:id — edit an existing account. Account Type is
+// never editable here: changing it would invalidate every transaction and
+// TXN_RULES check (2.3) already posted against the original type. Status
+// has no such hazard — closing an account has no balance-zero requirement
+// (2.1) — so it's editable alongside the same cosmetic/metadata fields
+// exposed on create.
+//
+// Beginning Balance is a narrower case: normally it's creation-only,
+// because it only seeds Current/Card Balance once (2.1) and is never
+// revisited afterward — transactionEngine.ts increments the balance
+// columns in place per transaction rather than re-deriving them from
+// Beginning Balance + history, so editing it once transactions exist would
+// desync the stored balance from its own history. But if zero transactions
+// have ever posted against the account, that hazard doesn't apply yet —
+// Current/Card Balance still exactly equals Beginning Balance — so a
+// correction is safe and re-seeds both the same way POST does.
 accountsRouter.patch("/:id", (req, res) => {
   const existing = db.prepare("SELECT * FROM accounts WHERE id = ?").get(req.params.id) as unknown as AccountRow | undefined;
   if (!existing) return res.status(404).json({ errors: ["Account not found."] });
@@ -149,19 +165,40 @@ accountsRouter.patch("/:id", (req, res) => {
     interestRatePct: body.interestRatePct,
     creditLimitMinor: body.creditLimitMinor,
     loanAmountMinor: body.loanAmountMinor,
+    beginningBalanceMinor: body.beginningBalanceMinor,
   };
 
   const errors = validateAccountInput(input);
   const status = body.status ?? existing.status;
   if (status !== "Active" && status !== "Closed") errors.push("Status must be Active or Closed.");
 
+  const isBalanceEdit = body.beginningBalanceMinor !== undefined && body.beginningBalanceMinor !== existing.beginning_balance_minor;
+  if (isBalanceEdit && accountHasTransactions(existing.id)) {
+    errors.push(
+      "Beginning Balance can't be corrected anymore — this account already has posted transactions, so its balance is built from that history, not from Beginning Balance. Record a correcting transaction instead."
+    );
+  }
+
   if (errors.length > 0) return res.status(422).json({ errors });
+
+  const isCreditCard = existing.account_type === "CreditCard";
+  // current_balance_minor/card_balance_minor are only ever recomputed here
+  // when isBalanceEdit is true (which validation above already guarantees
+  // means zero transactions exist) — otherwise they're written back
+  // unchanged, since they may hold real accumulated history that a Status
+  // or Credit Limit edit on this same request must not disturb.
+  const beginningBalanceMinor = isBalanceEdit ? input.beginningBalanceMinor! : existing.beginning_balance_minor;
+  const currentBalanceMinor = isBalanceEdit ? (isCreditCard ? 0 : beginningBalanceMinor) : existing.current_balance_minor;
+  const cardBalanceMinor = isBalanceEdit ? (isCreditCard ? beginningBalanceMinor : 0) : existing.card_balance_minor;
 
   try {
     db.prepare(
       `UPDATE accounts SET institution_name = @institutionName, account_name = @accountName,
          interest_rate_pct = @interestRatePct, credit_limit_minor = @creditLimitMinor,
-         loan_amount_minor = @loanAmountMinor, status = @status, updated_at = datetime('now')
+         loan_amount_minor = @loanAmountMinor, status = @status,
+         beginning_balance_minor = @beginningBalanceMinor,
+         current_balance_minor = @currentBalanceMinor, card_balance_minor = @cardBalanceMinor,
+         updated_at = datetime('now')
        WHERE id = @id`
     ).run({
       institutionName: input.institutionName ?? null,
@@ -170,6 +207,9 @@ accountsRouter.patch("/:id", (req, res) => {
       creditLimitMinor: input.creditLimitMinor ?? null,
       loanAmountMinor: input.loanAmountMinor ?? null,
       status,
+      beginningBalanceMinor,
+      currentBalanceMinor,
+      cardBalanceMinor,
       id: req.params.id,
     });
     const row = db.prepare("SELECT * FROM accounts WHERE id = ?").get(req.params.id) as unknown as AccountRow;
