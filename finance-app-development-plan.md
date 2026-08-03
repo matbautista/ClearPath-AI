@@ -15,10 +15,11 @@
 | Persistence | **SwiftData** | Apple's modern on-device ORM (built on Core Data). Since there's no backend, this removes the need to hand-roll sync/serialization logic. Design the schema to stay CloudKit-compatible from day one (avoid unique constraints, give every relationship a default/optional value) — costs nothing now, but keeps a future opt-in iCloud sync (e.g. for device migration or an iPad companion) a config change instead of a migration project |
 | Charts | Swift Charts | Native, free, integrates directly with SwiftData query results |
 | Architecture | MVVM + Repository | Keeps the "12 modules that all update shared balances" logic testable and out of the Views |
-| AI analysis | **Apple's on-device Foundation Models framework** (iOS 18.1+) | Since data must stay local, this is the only option that gives you real LLM-style reasoning without a network call. Fallback: a rules-based analysis engine you write yourself (see Phase 5) |
+| AI analysis | **Apple's on-device Foundation Models framework** (iOS 26+ — the developer-facing framework, not just Apple Intelligence being present on-device; verify against current Apple docs before locking the deployment target) | Since data must stay local, this is the only option that gives you real LLM-style reasoning without a network call. Fallback: a rules-based analysis engine you write yourself (see Phase 5) |
 | Local auth | Face ID / Passcode (LocalAuthentication framework) | This app holds a full financial picture — lock it behind biometrics by default |
+| Deployment target | iOS 17.x (SwiftData's minimum), independent of the AI feature's higher requirement | The app itself (SwiftData, Swift Charts, LocalAuthentication) only needs iOS 17+; keeping this decoupled from Foundation Models' iOS 26+ requirement is what makes the Phase 5 fallback possible at all |
 
-No backend, no API keys, no third-party financial data services needed for v1. This keeps the whole project buildable and testable entirely in Xcode/Simulator.
+No backend, no API keys, no third-party financial data services needed for v1. This keeps the whole project buildable in Xcode/Simulator — though Face ID and Foundation Models both need a physical device to fully validate, since Simulator only fakes biometric enrollment and doesn't reflect real on-device model availability.
 
 ---
 
@@ -31,11 +32,15 @@ Account (protocol-like base concept, implemented per type)
 ├── CashWallet          (single instance: current cash-on-hand balance)
 ├── BankAccount          (Bank Name, Account #, Account Name, Beginning/Current Balance)
 ├── InvestmentAccount    (Broker, Account #, Beginning/Current Balance)
-├── Loan                 (Lender, Loan #, Principal, Balance, Term, Due Date)
-├── CreditCard           (Issuer, Limit, Available/Card Balance, Cut-off, Due Date)
+├── Loan                 (Lender, Loan #, Principal, Balance, Term, Due Date, status: open/closed)
+├── CreditCard           (Issuer, Limit, Available/Card Balance, Cut-off, Due Date, status: open/closed)
 ├── Utility              (Provider, Service Acct #, Fee, Cut-off, Due Date)
 ├── IncomeSource         (Source Name, Category, Gross Amount, Currency, Pay Schedule)
 └── TaxFee               (Regulatory Name, Category, Amount, Currency, Fee Schedule)
+
+**`status` on Loan/CreditCard.** A fully-paid-off loan or a closed card shouldn't disappear (that destroys transaction history) or get deleted (that risks cascading the delete into its transactions, depending on the relationship delete rule chosen). Add an explicit `open`/`closed` status instead: closed accounts drop out of active dashboard totals and "upcoming dues" but stay queryable in history.
+
+**`CashWallet` single-instance enforcement.** The CloudKit-compat guidance above means avoiding a unique constraint, so nothing in the schema itself stops a second row from being created. Enforce this at the app layer instead: always fetch-or-create the one instance in the repository, and never expose an "add" affordance for it in the UI.
 
 **Polymorphism decision (settle in Phase 0).** SwiftData `@Model` relationships must point to a concrete type — you can't relate a `Transaction` to a protocol, and SwiftData's class-inheritance support for polymorphic queries is still unreliable in practice. Before writing the schema, pick one:
   (a) give `Transaction.mode` and `FinancialGoal.linkedAccounts` a separate optional relationship field per account type (8 nullable fields) and aggregate manually in the repository layer, or
@@ -52,7 +57,8 @@ Transaction
 ├── totalAmount: Decimal (computed: amount + fees)
 ├── indicator: enum { debit, credit }
 ├── mode: relationship → one of the Account types above (or .cash)
-├── category: enum { bills, billsPayment, cashPayment, cashDeposit, checkDeposit, cashWithdrawal, eCashTransfer, eCashPayment }
+├── category: enum { bills, billsPayment, cashPayment, cashDeposit, checkDeposit, cashWithdrawal, eCashTransfer, eCashPayment, ... }
+│     — this list only covers Phase 1's cash/bank needs. Treat it as open, not closed: Phase 2 needs cases for card purchases/payments and loan payments, Phase 4 needs buy/sell/dividend, and recurring modules need income/tax/utility payment cases. Extend it per-phase rather than trying to finalize it now.
 └── linkedTransactionID: UUID? (used for the paired debit/credit legs described below)
 
 FinancialGoal
@@ -62,11 +68,13 @@ FinancialGoal
 
 **Important design decision — double-entry transfers.** Your spec calls out that transfers between your own accounts (bank-to-bank, cash withdrawal from bank) must create **two linked transactions** (a debit leg and a credit leg). Model this as a `TransferService` that always writes both `Transaction` rows atomically and stamps them with the same `linkedTransactionID`, so a transfer can never exist as an orphaned single-sided entry. This is the single trickiest piece of business logic in the whole app — get this right early since almost every module depends on it (cash↔bank, bank↔bank, bank↔card payment, bank↔loan payment).
 
+**Integrity of the linked legs after creation.** A bare `linkedTransactionID: UUID?` match only protects atomicity at *write* time — it does nothing to stop a user from deleting or editing a single leg later from an ordinary transaction list screen, which reintroduces the exact orphaned-single-sided-entry problem `TransferService` exists to prevent. Two ways to close this gap, either is acceptable but pick one deliberately: (a) model `Transfer` as its own lightweight entity owning two `Transaction` children via a real SwiftData relationship, so a cascade-delete rule enforces both-or-neither at the persistence layer; or (b) keep the UUID-matching design but make every edit/delete entry point in the UI detect `linkedTransactionID != nil` and operate on both legs together, with no code path that touches one leg alone. Whichever you pick, cover it with the same unit tests planned for `TransferService`'s creation path.
+
 ---
 
 ## 3. App Structure (Screens)
 
-Maps directly to your spec's 8 sections:
+Maps to your spec's 8 core modules, plus Dashboard, Goals, and AI Insights layered on top:
 
 1. **Dashboard** — read-only aggregation screen (cash on hand, total bank, total loan balance, total card balance, upcoming dues). Built last within each phase, since it just queries the modules below.
 2. **Cash on Hand** — single balance + transaction list
@@ -100,23 +108,25 @@ Since there's no team and no rush, phases are ordered so each one is a fully wor
 
 **Phase 2 — Credit Cards & Loans**
 - Credit card setup, purchase tracking, payment tracking. `Available Balance` should be computed live as `Limit - Card Balance`, not stored independently — same live-compute/cache-for-display rule as everywhere else (see §5, Balance drift)
-- Loan setup, payment tracking, partial vs. full payoff logic
+- Loan setup, payment tracking, partial vs. full payoff logic, `open`/`closed` status transition on full payoff (see §2)
 - Extend `TransferService` (built in Phase 1) to cover bank↔card payment and bank↔loan payment as linked-transaction pairs — these are the same atomic double-entry pattern, not a new one-off implementation
+- **Due Date on Loan/CreditCard is inherently recurring (monthly), but the shared `RecurringSchedule` component isn't scheduled until Phase 3.** Pull a minimal version of that component into Phase 2 instead of inventing an ad hoc day-of-month field here that Phase 3 would otherwise need to throw away and redo
 - Extend Dashboard with these totals + "upcoming dues" (needs Due Date across Cards/Loans/Utilities)
 
 **Phase 3 — Recurring modules**
 - Utilities, Income Sources, Taxes & Regulatory Fees
-- These share a "recurring schedule" concept (Monthly/Quarterly/Bi-Monthly/Annually/Variable) — build one shared `RecurringSchedule` component instead of three copies
+- These share a "recurring schedule" concept (Monthly/Quarterly/Bi-Monthly/Annually/Variable) — generalize the minimal `RecurringSchedule` component pulled forward in Phase 2 rather than building it from scratch here
 - Optional: local notifications for upcoming due dates
 
 **Phase 4 — Investments**
 - Investment account setup, buy/sell/dividend transactions
-- Simple performance view (current vs. beginning balance)
+- Dividend transactions: decide whether they land in-place as an investment-account balance increase, or route through `TransferService` if they're paid out to a linked bank account — pick one and apply it consistently, don't let it vary per transaction
+- Performance view: a naive current-vs-beginning-balance comparison is misleading once contributions/withdrawals exist (a $10k deposit reads as a 100% "gain"). Either net out contributions/withdrawals before comparing, or scope this view down to "balance over time" and explicitly defer real return calculation
 
 **Phase 5 — Goals + AI Analysis**
 - Goal setup UI (debt payoff, emergency fund, investing targets)
 - Analysis engine: start with a **rules-based version first** (e.g. debt-avalanche/snowball calculation, months-to-emergency-fund based on average monthly expenses, surplus-to-invest calculation) — this works offline with zero AI dependency and is easy to unit test. Unit test the rules engine itself (avalanche/snowball math, months-to-goal projections) — these are pure functions and cheap to cover exhaustively
-- Layer the on-device Foundation Models framework on top to turn the rules-engine output into a natural-language plan/narrative, since the raw math is more trustworthy coming from your own deterministic code than from a model. Treat this layer as fully optional, not a Phase 5 blocker: Foundation Models requires iPhone 15 Pro+ and iOS 18.1+, so on older/unsupported hardware — including possibly your own primary device — "AI Insights" should silently and permanently show the rules-based narrative with no degraded/broken state to fix later
+- Layer the on-device Foundation Models framework on top to turn the rules-engine output into a natural-language plan/narrative, since the raw math is more trustworthy coming from your own deterministic code than from a model. Treat this layer as fully optional, not a Phase 5 blocker: Foundation Models requires iPhone 15 Pro+ hardware **and iOS 26+** — meaning any device on an older OS falls back too, not just older hardware — so on unsupported devices, including possibly your own primary device for a while, "AI Insights" should silently and permanently show the rules-based narrative with no degraded/broken state to fix later
 
 **Phase 6 — Polish**
 - Full Dashboard (all totals + upcoming dues sorted by date)
@@ -131,9 +141,10 @@ Since there's no team and no rush, phases are ordered so each one is a fully wor
 
 - **Money math**: use `Decimal`, never `Double`/`Float`, anywhere currency is stored or calculated — floating point rounding errors will corrupt balances over time.
 - **Balance drift**: because every module maintains a running balance (Current Balance, Available Balance, Card Balance, etc.) that's *derived* from transactions, decide early whether balances are (a) stored fields updated on each transaction write, or (b) always computed live from the transaction log. Recommendation: compute live from the transaction log for correctness, and cache for display performance — storing a mutable running balance that can drift out of sync with its transactions is the most common bug source in finance apps.
-- **On-device AI availability**: Foundation Models framework requires Apple Intelligence–capable hardware (iPhone 15 Pro and later, iOS 18.1+). Plan a graceful fallback to the rules-based engine on unsupported devices.
+- **On-device AI availability**: Foundation Models framework requires Apple Intelligence–capable hardware (iPhone 15 Pro and later) **and iOS 26+** — the framework is a developer API introduced in iOS 26, distinct from Apple Intelligence merely existing on-device since iOS 18.1. Plan a graceful fallback to the rules-based engine on unsupported devices *and* unsupported OS versions.
 - **No backend means no safety net**: with 100% on-device storage and no cloud sync, a corrupted SwiftData store, accidental delete, or lost/replaced device means permanent data loss unless an explicit export/backup path exists (see Phase 6). Don't let this slip to "someday" — it's the single highest-consequence gap for a finance app.
 - **Untested money logic compounds silently**: `TransferService` and the rules-based analysis engine are the two places a subtle bug corrupts numbers a user trusts without any visible error. Cover both with unit tests as they're built (Phase 1 and Phase 5), not retroactively.
+- **Schema evolves across ~6 phases with real user data at stake**: SwiftData's lightweight migration only handles additive changes gracefully; the Phase 0 polymorphism decision and the linked-transaction modeling (see §2) are exactly the kind of structural choices that are expensive to reverse once Phase 1+ data exists. Snapshot schema versions as you go rather than treating migration as a Phase 6 afterthought.
 
 ---
 
