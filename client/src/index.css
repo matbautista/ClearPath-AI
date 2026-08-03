@@ -1,0 +1,240 @@
+:root {
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --border: #e2e5eb;
+  --text: #1a1d23;
+  --text-muted: #6b7380;
+  --accent: #0f766e;
+  --accent-hover: #0b5d56;
+  --danger: #b42318;
+  --danger-bg: #fef3f2;
+  --status-active-bg: #ecfdf5;
+  --status-active-text: #067647;
+  --status-closed-bg: #f3f4f6;
+  --status-closed-text: #6b7380;
+  --radius: 8px;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #16181d;
+    --surface: #1e2127;
+    --border: #2c3038;
+    --text: #e6e8eb;
+    --text-muted: #8b909c;
+    --accent: #2dd4bf;
+    --accent-hover: #5eead4;
+    --danger: #f87171;
+    --danger-bg: #2a1616;
+    --status-active-bg: #0d2b21;
+    --status-active-text: #34d399;
+    --status-closed-bg: #24272e;
+    --status-closed-text: #8b909c;
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: #16181d;
+  --surface: #1e2127;
+  --border: #2c3038;
+  --text: #e6e8eb;
+  --text-muted: #8b909c;
+  --accent: #2dd4bf;
+  --accent-hover: #5eead4;
+  --danger: #f87171;
+  --danger-bg: #2a1616;
+  --status-active-bg: #0d2b21;
+  --status-active-text: #34d399;
+  --status-closed-bg: #24272e;
+  --status-closed-text: #8b909c;
+  color-scheme: dark;
+}
+
+:root[data-theme="light"] {
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --border: #e2e5eb;
+  --text: #1a1d23;
+  --text-muted: #6b7380;
+  --accent: #0f766e;
+  --accent-hover: #0b5d56;
+  --danger: #b42318;
+  --danger-bg: #fef3f2;
+  --status-active-bg: #ecfdf5;
+  --status-active-text: #067647;
+  --status-closed-bg: #f3f4f6;
+  --status-closed-text: #6b7380;
+  color-scheme: light;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+#root {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 40px 24px 80px;
+}
+
+.page-header h1 {
+  font-size: 1.75rem;
+  font-weight: 700;
+  margin: 0 0 4px;
+  text-wrap: balance;
+}
+
+.page-subtitle {
+  color: var(--text-muted);
+  margin: 0 0 32px;
+  max-width: 60ch;
+}
+
+.muted {
+  color: var(--text-muted);
+}
+
+section {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  margin-bottom: 24px;
+}
+
+section h2 {
+  font-size: 1.1rem;
+  margin: 0 0 16px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th, td {
+  text-align: left;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.9rem;
+}
+
+th {
+  color: var(--text-muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+}
+
+td.numeric, th.numeric {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+tr:last-child td {
+  border-bottom: none;
+}
+
+.balance-primary {
+  font-weight: 600;
+}
+
+.balance-secondary {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+.status-pill {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.status-active {
+  background: var(--status-active-bg);
+  color: var(--status-active-text);
+}
+
+.status-closed {
+  background: var(--status-closed-bg);
+  color: var(--status-closed-text);
+}
+
+form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.field-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  flex: 1 1 160px;
+}
+
+input, select {
+  font: inherit;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+
+input:focus, select:focus, button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+button {
+  align-self: flex-start;
+  font: inherit;
+  font-weight: 600;
+  background: var(--accent);
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  padding: 10px 20px;
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.form-errors {
+  background: var(--danger-bg);
+  color: var(--danger);
+  border-radius: 6px;
+  padding: 10px 16px;
+  margin: 0;
+  font-size: 0.85rem;
+}
