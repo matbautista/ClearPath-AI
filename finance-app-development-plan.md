@@ -14,7 +14,7 @@
 | UI | SwiftUI | Fastest way to build the dashboard/list-heavy screens this app needs |
 | Persistence | **SwiftData** | Apple's modern on-device ORM (built on Core Data). Since there's no backend, this removes the need to hand-roll sync/serialization logic. Design the schema to stay CloudKit-compatible from day one (avoid unique constraints, give every relationship a default/optional value) — costs nothing now, but keeps a future opt-in iCloud sync (e.g. for device migration or an iPad companion) a config change instead of a migration project |
 | Charts | Swift Charts | Native, free, integrates directly with SwiftData query results |
-| Architecture | MVVM + Repository | Keeps the "12 modules that all update shared balances" logic testable and out of the Views |
+| Architecture | MVVM + Repository | Keeps the 8 core modules' "all update shared balances" logic testable and out of the Views |
 | AI analysis | **Apple's on-device Foundation Models framework** (iOS 26+ — the developer-facing framework, not just Apple Intelligence being present on-device; verify against current Apple docs before locking the deployment target) | Since data must stay local, this is the only option that gives you real LLM-style reasoning without a network call. Fallback: a rules-based analysis engine you write yourself (see Phase 5) |
 | Local auth | Face ID / Passcode (LocalAuthentication framework) | This app holds a full financial picture — lock it behind biometrics by default |
 | Deployment target | iOS 17.x (SwiftData's minimum), independent of the AI feature's higher requirement | The app itself (SwiftData, Swift Charts, LocalAuthentication) only needs iOS 17+; keeping this decoupled from Foundation Models' iOS 26+ requirement is what makes the Phase 5 fallback possible at all |
@@ -38,7 +38,7 @@ Account (protocol-like base concept, implemented per type)
 ├── IncomeSource         (Source Name, Category, Gross Amount, Currency, Pay Schedule)
 └── TaxFee               (Regulatory Name, Category, Amount, Currency, Fee Schedule)
 
-**`status` on Loan/CreditCard.** A fully-paid-off loan or a closed card shouldn't disappear (that destroys transaction history) or get deleted (that risks cascading the delete into its transactions, depending on the relationship delete rule chosen). Add an explicit `open`/`closed` status instead: closed accounts drop out of active dashboard totals and "upcoming dues" but stay queryable in history.
+**`status` on Loan/CreditCard.** A fully-paid-off loan or a closed card shouldn't disappear (that destroys transaction history) or get deleted (that risks cascading the delete into its transactions, depending on the relationship delete rule chosen). Add an explicit `open`/`closed` status instead: closed accounts drop out of active dashboard totals and "upcoming dues" but stay queryable in history. Note the two entities reach `closed` differently: a `Loan` naturally transitions when `Balance` hits zero via full payoff, but a `CreditCard` can be closed by user action while `Card Balance` is still nonzero (a cancelled card being paid down) — closing a card must not require a zero balance, and a closed-but-still-owed card should keep counting toward debt totals until its balance actually reaches zero.
 
 **`CashWallet` single-instance enforcement.** The CloudKit-compat guidance above means avoiding a unique constraint, so nothing in the schema itself stops a second row from being created. Enforce this at the app layer instead: always fetch-or-create the one instance in the repository, and never expose an "add" affordance for it in the UI.
 
@@ -60,11 +60,21 @@ Transaction
 ├── category: enum { bills, billsPayment, cashPayment, cashDeposit, checkDeposit, cashWithdrawal, eCashTransfer, eCashPayment, ... }
 │     — this list only covers Phase 1's cash/bank needs. Treat it as open, not closed: Phase 2 needs cases for card purchases/payments and loan payments, Phase 4 needs buy/sell/dividend, and recurring modules need income/tax/utility payment cases. Extend it per-phase rather than trying to finalize it now.
 └── linkedTransactionID: UUID? (used for the paired debit/credit legs described below)
+    — no soft-delete field: deleting a Transaction is permanent. That's a deliberate v1 simplicity call, not an oversight — revisit only if losing history to an accidental delete turns out to matter in practice.
+
+RecurringSchedule
+├── frequency: enum { monthly, quarterly, biMonthly, annually, variable }
+├── anchorDate: Date (the first/reference occurrence)
+└── nextDueDate: Date (computed from anchorDate + frequency, or overridden for `variable`)
+    — introduced in Phase 2 for Loan/CreditCard `Due Date` and `Cut-off` (both recur monthly), generalized in Phase 3 for Utilities/Income/Taxes. Define it here rather than inline on each entity so all six use sites (Due Date × 2, Cut-off × 2, Utility/Income/Tax schedules) share one component from the start.
 
 FinancialGoal
 ├── name, targetAmount, targetDate, goalType (debtPayoff / emergencyFund / investment)
 ├── linkedAccounts: [Account] (e.g. link a goal to a specific Loan to track payoff progress)
+├── achieved: Bool, completedDate: Date? (set when a linked Loan's status flips to `closed`, or the target is otherwise reached — without this, a goal has no way to represent "done")
 ```
+
+**`linkedAccounts` can dangle.** Same class of problem as the linked-transaction integrity issue above: if a `Loan` (or any linked `Account`) is deleted outright rather than transitioned to `closed`, a `FinancialGoal` referencing it is left pointing at nothing. Once `status` exists (see below), steer deletion UI toward "close" for accounts with goal references, and treat outright deletion of a goal-linked account as something the repository layer actively guards against rather than allows silently.
 
 **Important design decision — double-entry transfers.** Your spec calls out that transfers between your own accounts (bank-to-bank, cash withdrawal from bank) must create **two linked transactions** (a debit leg and a credit leg). Model this as a `TransferService` that always writes both `Transaction` rows atomically and stamps them with the same `linkedTransactionID`, so a transfer can never exist as an orphaned single-sided entry. This is the single trickiest piece of business logic in the whole app — get this right early since almost every module depends on it (cash↔bank, bank↔bank, bank↔card payment, bank↔loan payment).
 
@@ -110,7 +120,7 @@ Since there's no team and no rush, phases are ordered so each one is a fully wor
 - Credit card setup, purchase tracking, payment tracking. `Available Balance` should be computed live as `Limit - Card Balance`, not stored independently — same live-compute/cache-for-display rule as everywhere else (see §5, Balance drift)
 - Loan setup, payment tracking, partial vs. full payoff logic, `open`/`closed` status transition on full payoff (see §2)
 - Extend `TransferService` (built in Phase 1) to cover bank↔card payment and bank↔loan payment as linked-transaction pairs — these are the same atomic double-entry pattern, not a new one-off implementation
-- **Due Date on Loan/CreditCard is inherently recurring (monthly), but the shared `RecurringSchedule` component isn't scheduled until Phase 3.** Pull a minimal version of that component into Phase 2 instead of inventing an ad hoc day-of-month field here that Phase 3 would otherwise need to throw away and redo
+- **Due Date and Cut-off on Loan/CreditCard are both inherently recurring (monthly), but the shared `RecurringSchedule` component isn't scheduled until Phase 3.** Use the minimal `RecurringSchedule` entity defined in §2 for both fields on both entities here instead of inventing ad hoc day-of-month fields that Phase 3 would otherwise need to throw away and redo
 - Extend Dashboard with these totals + "upcoming dues" (needs Due Date across Cards/Loans/Utilities)
 
 **Phase 3 — Recurring modules**
@@ -125,7 +135,7 @@ Since there's no team and no rush, phases are ordered so each one is a fully wor
 
 **Phase 5 — Goals + AI Analysis**
 - Goal setup UI (debt payoff, emergency fund, investing targets)
-- Analysis engine: start with a **rules-based version first** (e.g. debt-avalanche/snowball calculation, months-to-emergency-fund based on average monthly expenses, surplus-to-invest calculation) — this works offline with zero AI dependency and is easy to unit test. Unit test the rules engine itself (avalanche/snowball math, months-to-goal projections) — these are pure functions and cheap to cover exhaustively
+- Analysis engine: start with a **rules-based version first** (e.g. debt-avalanche/snowball calculation, months-to-emergency-fund based on average monthly expenses over a trailing 3-month window — long enough to smooth one-off spending spikes, short enough to react to a real change in habits — surplus-to-invest calculation) — this works offline with zero AI dependency and is easy to unit test. Unit test the rules engine itself (avalanche/snowball math, months-to-goal projections) — these are pure functions and cheap to cover exhaustively
 - Layer the on-device Foundation Models framework on top to turn the rules-engine output into a natural-language plan/narrative, since the raw math is more trustworthy coming from your own deterministic code than from a model. Treat this layer as fully optional, not a Phase 5 blocker: Foundation Models requires iPhone 15 Pro+ hardware **and iOS 26+** — meaning any device on an older OS falls back too, not just older hardware — so on unsupported devices, including possibly your own primary device for a while, "AI Insights" should silently and permanently show the rules-based narrative with no degraded/broken state to fix later
 
 **Phase 6 — Polish**
