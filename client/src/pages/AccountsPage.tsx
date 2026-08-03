@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api, ApiError } from "../api";
 import { formatMinor, toMinorUnits } from "../lib/money";
+import { useSettings } from "../SettingsContext";
 import type { Account, AccountType, NewAccountInput } from "../types";
 
 const ACCOUNT_TYPES: AccountType[] = ["Cash", "Bank", "Investment", "Loan", "CreditCard"];
@@ -18,6 +19,7 @@ function emptyForm(): Partial<NewAccountInput> & { accountType: AccountType } {
 }
 
 export function AccountsPage() {
+  const { baseCurrency } = useSettings();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState(emptyForm());
@@ -57,14 +59,14 @@ export function AccountsPage() {
     if (account.accountType === "CreditCard") {
       return (
         <>
-          <div className="balance-primary">{formatMinor(account.cardBalanceMinor ?? 0)} owed</div>
+          <div className="balance-primary">{formatMinor(account.cardBalanceMinor ?? 0, baseCurrency)} owed</div>
           <div className="balance-secondary">
-            {formatMinor(account.availableBalanceMinor ?? 0)} available
+            {formatMinor(account.availableBalanceMinor ?? 0, baseCurrency)} available
           </div>
         </>
       );
     }
-    return <div className="balance-primary">{formatMinor(account.currentBalanceMinor ?? 0)}</div>;
+    return <div className="balance-primary">{formatMinor(account.currentBalanceMinor ?? 0, baseCurrency)}</div>;
   }
 
   const isCreditCard = form.accountType === "CreditCard";

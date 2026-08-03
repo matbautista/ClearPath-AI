@@ -65,11 +65,11 @@ accountsRouter.get("/", (req, res) => {
     status === "Active" || status === "Closed"
       ? db.prepare("SELECT * FROM accounts WHERE status = ? ORDER BY account_type, account_name").all(status)
       : db.prepare("SELECT * FROM accounts ORDER BY account_type, account_name").all();
-  res.json((rows as AccountRow[]).map(toApiShape));
+  res.json((rows as unknown as AccountRow[]).map(toApiShape));
 });
 
 accountsRouter.get("/:id", (req, res) => {
-  const row = db.prepare("SELECT * FROM accounts WHERE id = ?").get(req.params.id) as AccountRow | undefined;
+  const row = db.prepare("SELECT * FROM accounts WHERE id = ?").get(req.params.id) as unknown as AccountRow | undefined;
   if (!row) return res.status(404).json({ errors: ["Account not found."] });
   res.json(toApiShape(row));
 });
@@ -119,7 +119,7 @@ accountsRouter.post("/", (req, res) => {
       cutOffDateDay: input.cutOffDateDay ?? null,
       reminderLeadTimeDays: input.reminderLeadTimeDays ?? null,
     });
-    const row = db.prepare("SELECT * FROM accounts WHERE id = ?").get(info.lastInsertRowid) as AccountRow;
+    const row = db.prepare("SELECT * FROM accounts WHERE id = ?").get(info.lastInsertRowid) as unknown as AccountRow;
     res.status(201).json(toApiShape(row));
   } catch (err) {
     res.status(500).json({ errors: [(err as Error).message] });

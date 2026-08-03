@@ -238,3 +238,81 @@ button:disabled {
   margin: 0;
   font-size: 0.85rem;
 }
+
+button.secondary {
+  background: transparent;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+}
+
+button.secondary:hover:not(:disabled) {
+  background: var(--status-active-bg);
+}
+
+/* --- Auth pages (Setup / Login) --- */
+.auth-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: -40px -24px -80px;
+}
+
+.auth-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 40px;
+  width: 100%;
+  max-width: 380px;
+}
+
+.auth-card h1 {
+  font-size: 1.4rem;
+  margin: 0 0 8px;
+  text-wrap: balance;
+}
+
+.auth-card .page-subtitle {
+  margin-bottom: 24px;
+}
+
+/* --- App nav --- */
+.app-nav {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding-bottom: 24px;
+  margin-bottom: 24px;
+  border-bottom: 1px solid var(--border);
+}
+
+.app-brand {
+  font-weight: 700;
+  font-size: 1.05rem;
+}
+
+.app-nav-links {
+  display: flex;
+  gap: 8px;
+  flex: 1;
+}
+
+.nav-link, .nav-active {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.nav-link:hover {
+  background: var(--status-closed-bg);
+}
+
+.nav-active {
+  color: var(--accent);
+  background: var(--status-active-bg);
+}

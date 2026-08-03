@@ -1,0 +1,101 @@
+import { Router } from "express";
+import { db } from "../db.js";
+import { hashPassphrase, verifyPassphrase } from "../lib/passphrase.js";
+import { createSession, destroySession, SESSION_COOKIE } from "../lib/session.js";
+
+export const settingsRouter = Router();
+
+const COOKIE_OPTS = {
+  httpOnly: true,
+  sameSite: "lax" as const,
+  // NOTE: `secure: true` should be turned on once this is served over
+  // HTTPS (4.3 requires TLS for the app itself) — left off for local dev.
+};
+
+interface SettingsRow {
+  id: number;
+  base_currency: string;
+  auth_passphrase_hash: string;
+  ai_analysis_enabled: number;
+  ai_provider: string | null;
+  ai_scheduled_auto_run: number;
+  ai_last_call_at: string | null;
+  ai_call_count: number;
+  notification_email: string | null;
+  smtp_host: string | null;
+  smtp_port: number | null;
+  smtp_username: string | null;
+  default_reminder_lead_time_days: number;
+}
+
+function getSettingsRow(): SettingsRow | undefined {
+  return db.prepare("SELECT * FROM settings WHERE id = 1").get() as SettingsRow | undefined;
+}
+
+// Public — the client uses this to decide whether to show Setup or Login.
+settingsRouter.get("/status", (_req, res) => {
+  res.json({ configured: !!getSettingsRow() });
+});
+
+// Public, first-run only (2.0/4.3): creates the single Settings row.
+settingsRouter.post("/setup", (req, res) => {
+  if (getSettingsRow()) {
+    return res.status(409).json({ errors: ["Already set up — use /login instead."] });
+  }
+  const { baseCurrency, passphrase } = req.body as { baseCurrency?: string; passphrase?: string };
+  const errors: string[] = [];
+  if (!baseCurrency || !/^[A-Z]{3}$/.test(baseCurrency)) {
+    errors.push("Base Currency must be a 3-letter ISO 4217 code (e.g. PHP, USD).");
+  }
+  if (!passphrase || passphrase.length < 8) {
+    errors.push("Passphrase must be at least 8 characters.");
+  }
+  if (errors.length > 0) return res.status(422).json({ errors });
+
+  db.prepare(
+    `INSERT INTO settings (id, base_currency, auth_passphrase_hash, default_reminder_lead_time_days)
+     VALUES (1, ?, ?, 3)`
+  ).run(baseCurrency!, hashPassphrase(passphrase!));
+
+  const token = createSession();
+  res.cookie(SESSION_COOKIE, token, COOKIE_OPTS);
+  res.status(201).json({ baseCurrency });
+});
+
+settingsRouter.post("/login", (req, res) => {
+  const row = getSettingsRow();
+  if (!row) return res.status(409).json({ errors: ["Not set up yet — use /setup first."] });
+  const { passphrase } = req.body as { passphrase?: string };
+  if (!passphrase || !verifyPassphrase(passphrase, row.auth_passphrase_hash)) {
+    return res.status(401).json({ errors: ["Incorrect passphrase."] });
+  }
+  const token = createSession();
+  res.cookie(SESSION_COOKIE, token, COOKIE_OPTS);
+  res.json({ ok: true });
+});
+
+settingsRouter.post("/logout", (req, res) => {
+  destroySession(req.cookies?.[SESSION_COOKIE]);
+  res.clearCookie(SESSION_COOKIE);
+  res.json({ ok: true });
+});
+
+// Authenticated — non-secret fields only. Never returns
+// auth_passphrase_hash, ai_api_key_encrypted, or smtp_password_encrypted.
+settingsRouter.get("/me", (_req, res) => {
+  const row = getSettingsRow();
+  if (!row) return res.status(404).json({ errors: ["Not set up yet."] });
+  res.json({
+    baseCurrency: row.base_currency,
+    aiAnalysisEnabled: !!row.ai_analysis_enabled,
+    aiProvider: row.ai_provider,
+    aiScheduledAutoRun: !!row.ai_scheduled_auto_run,
+    aiLastCallAt: row.ai_last_call_at,
+    aiCallCount: row.ai_call_count,
+    notificationEmail: row.notification_email,
+    smtpHost: row.smtp_host,
+    smtpPort: row.smtp_port,
+    smtpUsername: row.smtp_username,
+    defaultReminderLeadTimeDays: row.default_reminder_lead_time_days,
+  });
+});
