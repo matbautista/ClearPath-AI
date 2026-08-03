@@ -142,7 +142,7 @@ Since there's no team and no rush, phases are ordered so each one is a fully wor
 
 **Phase 6 — Polish**
 - Full Dashboard (all totals + upcoming dues sorted by date)
-- Charts (spending by category, net worth trend, debt payoff trajectory)
+- Charts (spending by category, net worth trend, debt payoff trajectory). Net worth trend needs balance-as-of-past-dates, which §5's "compute live from the transaction log" resolution doesn't give you for free — decide then between periodic snapshotting or replaying the log up to each historical date, based on how large the transaction log has actually grown by that point
 - CSV export **and full JSON backup/restore** — not just "nice to have." This app is the only copy of someone's full financial picture with no backend; without an explicit, human-triggerable export/restore path, the only safety net is an implicit iCloud device backup, which won't help against SwiftData corruption, an accidental delete, or moving to a new device before a backup runs. Treat backup/restore as a Phase 6 requirement, not a stretch goal
 - The JSON backup file itself must be encrypted or password-protected before it can land in Files/iCloud Drive/AirDrop — an app that's biometric-locked on-device but exports a plaintext dump of the user's full financial picture undermines its own security model
 - App Store screenshots/listing if you intend to publish
