@@ -28,17 +28,19 @@ No backend, no API keys, no third-party financial data services needed for v1. T
 Everything in your spec collapses into a handful of SwiftData models. The key insight from your spec: **every module (Cash, Bank, Investments, Loans, Cards, Utilities, Income, Taxes) is really just "an account/source" that owns a stream of `Transaction`s**, and the dashboard is just aggregation over those.
 
 ```
-Account (protocol-like base concept, implemented per type)
+Account (protocol-like base concept, implemented per type — every concrete type below carries `status: open/closed`, decided once in Phase 0 rather than bolted on per-type later)
 ├── CashWallet          (single instance: current cash-on-hand balance)
 ├── BankAccount          (Bank Name, Account #, Account Name, Beginning/Current Balance)
 ├── InvestmentAccount    (Broker, Account #, Beginning/Current Balance)
-├── Loan                 (Lender, Loan #, Principal, Balance, Term, Due Date, status: open/closed)
-├── CreditCard           (Issuer, Limit, Available/Card Balance, Cut-off, Due Date, status: open/closed)
-├── Utility              (Provider, Service Acct #, Fee, Cut-off, Due Date)
+├── Loan                 (Lender, Loan #, Principal, Balance, Interest Rate, Term, Due Date → RecurringSchedule)
+├── CreditCard           (Issuer, Limit, Available/Card Balance, Interest Rate, Cut-off → RecurringSchedule, Due Date → RecurringSchedule)
+├── Utility              (Provider, Service Acct #, Fee, Cut-off → RecurringSchedule, Due Date → RecurringSchedule)
 ├── IncomeSource         (Source Name, Category, Gross Amount, Currency, Pay Schedule)
 └── TaxFee               (Regulatory Name, Category, Amount, Currency, Fee Schedule)
 
-**`status` on Loan/CreditCard.** A fully-paid-off loan or a closed card shouldn't disappear (that destroys transaction history) or get deleted (that risks cascading the delete into its transactions, depending on the relationship delete rule chosen). Add an explicit `open`/`closed` status instead: closed accounts drop out of active dashboard totals and "upcoming dues" but stay queryable in history. Note the two entities reach `closed` differently: a `Loan` naturally transitions when `Balance` hits zero via full payoff, but a `CreditCard` can be closed by user action while `Card Balance` is still nonzero (a cancelled card being paid down) — closing a card must not require a zero balance, and a closed-but-still-owed card should keep counting toward debt totals until its balance actually reaches zero.
+**`status` belongs on the shared `Account` concept, decided in Phase 0.** A fully-paid-off loan, a closed card, or a bank/investment account the user closes out shouldn't disappear (that destroys transaction history) or get deleted (that risks cascading the delete into its transactions, depending on the relationship delete rule chosen). Add an explicit `open`/`closed` status to every account type from the start — not just Loan/CreditCard — since `BankAccount` ships in Phase 1, a full phase before any per-type retrofit would happen, and adding it later is exactly the kind of structural schema change that's expensive once real data exists (see §5). Closed accounts drop out of active dashboard totals and "upcoming dues" but stay queryable in history. Note `Loan` and `CreditCard` reach `closed` differently: a `Loan` naturally transitions when `Balance` hits zero via full payoff, but a `CreditCard` can be closed by user action while `Card Balance` is still nonzero (a cancelled card being paid down) — closing a card must not require a zero balance, and a closed-but-still-owed card should keep counting toward debt totals until its balance actually reaches zero.
+
+**Interest Rate on Loan/CreditCard.** Phase 5's rules engine names "debt-avalanche" as one of its calculations, and avalanche specifically orders debts by interest rate to minimize total interest paid — it cannot be computed without a rate field on both entities. (Snowball, which orders by balance, would work without it, but the plan names both.) Add it now rather than discovering the gap when Phase 5 tries to implement avalanche against a schema with nowhere to read a rate from.
 
 **`CashWallet` single-instance enforcement.** The CloudKit-compat guidance above means avoiding a unique constraint, so nothing in the schema itself stops a second row from being created. Enforce this at the app layer instead: always fetch-or-create the one instance in the repository, and never expose an "add" affordance for it in the UI.
 
@@ -71,10 +73,10 @@ RecurringSchedule
 FinancialGoal
 ├── name, targetAmount, targetDate, goalType (debtPayoff / emergencyFund / investment)
 ├── linkedAccounts: [Account] (e.g. link a goal to a specific Loan to track payoff progress)
-├── achieved: Bool, completedDate: Date? (set when a linked Loan's status flips to `closed`, or the target is otherwise reached — without this, a goal has no way to represent "done")
+├── achieved: Bool, completedDate: Date? (trigger differs by `goalType`: `debtPayoff` sets it when the linked Loan's status flips to `closed`; `emergencyFund`/`investment` have no linked Loan to key off, so they need their own trigger — linked account balance reaching `targetAmount` — which isn't yet specified anywhere else in this doc and should be nailed down in Phase 5)
 ```
 
-**`linkedAccounts` can dangle.** Same class of problem as the linked-transaction integrity issue above: if a `Loan` (or any linked `Account`) is deleted outright rather than transitioned to `closed`, a `FinancialGoal` referencing it is left pointing at nothing. Once `status` exists (see below), steer deletion UI toward "close" for accounts with goal references, and treat outright deletion of a goal-linked account as something the repository layer actively guards against rather than allows silently.
+**`linkedAccounts` can dangle.** Same class of problem as the linked-transaction integrity issue above: if a `Loan` (or any linked `Account`) is deleted outright rather than transitioned to `closed`, a `FinancialGoal` referencing it is left pointing at nothing. Once `status` exists (see above), steer deletion UI toward "close" for accounts with goal references, and treat outright deletion of a goal-linked account as something the repository layer actively guards against rather than allows silently.
 
 **Important design decision — double-entry transfers.** Your spec calls out that transfers between your own accounts (bank-to-bank, cash withdrawal from bank) must create **two linked transactions** (a debit leg and a credit leg). Model this as a `TransferService` that always writes both `Transaction` rows atomically and stamps them with the same `linkedTransactionID`, so a transfer can never exist as an orphaned single-sided entry. This is the single trickiest piece of business logic in the whole app — get this right early since almost every module depends on it (cash↔bank, bank↔bank, bank↔card payment, bank↔loan payment).
 
@@ -105,7 +107,7 @@ Maps to your spec's 8 core modules, plus Dashboard, Goals, and AI Insights layer
 Since there's no team and no rush, phases are ordered so each one is a fully working, testable slice — you can stop after any phase and have something functional.
 
 **Phase 0 — Foundation**
-- Xcode project, SwiftData schema for all models above
+- Xcode project, SwiftData schema for all models above, including the shared `status: open/closed` field on every `Account` type and the `RecurringSchedule` entity (see §2) — settle both now since `BankAccount` (Phase 1) and `Loan`/`CreditCard` (Phase 2) both depend on them existing from the start
 - App-wide `Decimal`-based currency formatting (never use `Double` for money)
 - Face ID lock screen
 - Set up the unit test target now, not later — for a finance app, tests are cheapest to write alongside the code they cover instead of retrofitted
@@ -135,7 +137,7 @@ Since there's no team and no rush, phases are ordered so each one is a fully wor
 
 **Phase 5 — Goals + AI Analysis**
 - Goal setup UI (debt payoff, emergency fund, investing targets)
-- Analysis engine: start with a **rules-based version first** (e.g. debt-avalanche/snowball calculation, months-to-emergency-fund based on average monthly expenses over a trailing 3-month window — long enough to smooth one-off spending spikes, short enough to react to a real change in habits — surplus-to-invest calculation) — this works offline with zero AI dependency and is easy to unit test. Unit test the rules engine itself (avalanche/snowball math, months-to-goal projections) — these are pure functions and cheap to cover exhaustively
+- Analysis engine: start with a **rules-based version first** (e.g. debt-avalanche/snowball calculation, months-to-emergency-fund based on average monthly expenses over a trailing 3-month window — long enough to smooth one-off spending spikes, short enough to react to a real change in habits — surplus-to-invest calculation) — this works offline with zero AI dependency and is easy to unit test. **"Expenses" must exclude `TransferService`-created linked-transaction legs** (any `Transaction` with `linkedTransactionID != nil`) — a naive sum of debits would double-count every bank↔bank/bank↔card/bank↔loan transfer as spending, when the money never actually left the household. Unit test the rules engine itself (avalanche/snowball math, months-to-goal projections, and the transfer-exclusion filter) — these are pure functions and cheap to cover exhaustively
 - Layer the on-device Foundation Models framework on top to turn the rules-engine output into a natural-language plan/narrative, since the raw math is more trustworthy coming from your own deterministic code than from a model. Treat this layer as fully optional, not a Phase 5 blocker: Foundation Models requires iPhone 15 Pro+ hardware **and iOS 26+** — meaning any device on an older OS falls back too, not just older hardware — so on unsupported devices, including possibly your own primary device for a while, "AI Insights" should silently and permanently show the rules-based narrative with no degraded/broken state to fix later
 
 **Phase 6 — Polish**
