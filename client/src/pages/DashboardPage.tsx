@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api, type DashboardSummary, type NetWorthTrendPoint, type SavingsRateResult, type Goal } from "../api";
+import { api, type DashboardSummary, type NetWorthTrendPoint, type SavingsRateResult, type Goal, type MoneyPitFlag } from "../api";
 import { formatMinor } from "../lib/money";
 import { useSettings } from "../SettingsContext";
 import { NetWorthChart } from "../components/NetWorthChart";
@@ -27,6 +27,31 @@ function StatTile({ label, valueMinor, currency, emphasis }: { label: string; va
   );
 }
 
+function MoneyPitCard({ flag, currency, onDismiss }: { flag: MoneyPitFlag; currency: string; onDismiss: () => void }) {
+  const m = flag.metric;
+  return (
+    <li className="money-pit-item">
+      <div className="money-pit-body">
+        {flag.flagType === "CategoryTrend" ? (
+          <>
+            <strong>{flag.spendingCategoryName}</strong> is up {m?.growthPct}% this month —{" "}
+            {formatMinor(m?.currentMonthMinor ?? 0, currency)} vs. a {formatMinor(m?.trailingAvgMinor ?? 0, currency)} trailing average.
+          </>
+        ) : (
+          <>
+            <strong>{flag.clusterDescription}</strong>: {m?.occurrenceCount} charges of ~{formatMinor(m?.avgAmountMinor ?? 0, currency)} each,
+            about {formatMinor(m?.monthlyEquivalentMinor ?? 0, currency)}/month.
+            {flag.utilizationNote && <div className="muted">Note: {flag.utilizationNote}</div>}
+          </>
+        )}
+      </div>
+      <button type="button" className="secondary" onClick={onDismiss}>
+        Dismiss
+      </button>
+    </li>
+  );
+}
+
 export function DashboardPage() {
   const { baseCurrency } = useSettings();
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
@@ -34,18 +59,25 @@ export function DashboardPage() {
   const [savingsRate, setSavingsRate] = useState<SavingsRateResult | null>(null);
   const [savingsPeriod, setSavingsPeriod] = useState<30 | 90>(30);
   const [goals, setGoals] = useState<Goal[]>([]);
+  const [moneyPits, setMoneyPits] = useState<MoneyPitFlag[]>([]);
   const [loading, setLoading] = useState(true);
 
   function loadAll() {
     setLoading(true);
-    Promise.all([api.dashboardSummary(), api.netWorthTrend(90), api.savingsRate(savingsPeriod), api.listGoals()])
-      .then(([s, t, sr, g]) => {
+    Promise.all([api.dashboardSummary(), api.netWorthTrend(90), api.savingsRate(savingsPeriod), api.listGoals(), api.listMoneyPits()])
+      .then(([s, t, sr, g, mp]) => {
         setSummary(s);
         setTrend(t);
         setSavingsRate(sr);
         setGoals(g.filter((goal) => goal.status === "Active"));
+        setMoneyPits(mp);
       })
       .finally(() => setLoading(false));
+  }
+
+  async function dismissMoneyPit(id: number) {
+    await api.dismissMoneyPit(id);
+    setMoneyPits((prev) => prev.filter((f) => f.id !== id));
   }
 
   useEffect(loadAll, [savingsPeriod]);
@@ -123,9 +155,17 @@ export function DashboardPage() {
       <div className="dashboard-columns">
         <section>
           <h2>Money-pit flags</h2>
-          <p className="muted">
-            Spending pattern detection (3.11a) isn't built yet — this widget is a placeholder, not a working feature.
-          </p>
+          {moneyPits.length === 0 ? (
+            <p className="muted">
+              Nothing flagged right now. Category trends need ~3 months of history; charges need to repeat at least 3 times before they cluster (3.11a).
+            </p>
+          ) : (
+            <ul className="money-pit-list">
+              {moneyPits.map((f) => (
+                <MoneyPitCard key={f.id} flag={f} currency={baseCurrency} onDismiss={() => dismissMoneyPit(f.id)} />
+              ))}
+            </ul>
+          )}
         </section>
 
         <section>

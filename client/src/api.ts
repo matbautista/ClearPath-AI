@@ -277,6 +277,18 @@ export interface SavingsRateResult {
   rate: number | null;
 }
 
+export interface MoneyPitFlag {
+  id: number;
+  flagType: "CategoryTrend" | "RecurringChargeCluster";
+  spendingCategoryName: string | null;
+  clusterDescription: string | null;
+  metric: { growthPct?: number; currentMonthMinor?: number; trailingAvgMinor?: number; occurrenceCount?: number; avgAmountMinor?: number; monthlyEquivalentMinor?: number } | null;
+  utilizationNote: string | null;
+  status: "Active" | "Dismissed";
+  detectedAt: string;
+  dismissedAt: string | null;
+}
+
 export interface PendingTransaction {
   id: number;
   txnDate: string;
@@ -335,4 +347,9 @@ export const api = {
   dashboardSummary: (): Promise<DashboardSummary> => get("/api/dashboard/summary"),
   netWorthTrend: (days = 90): Promise<NetWorthTrendPoint[]> => get(`/api/dashboard/net-worth-trend?days=${days}`),
   savingsRate: (days = 30): Promise<SavingsRateResult> => get(`/api/dashboard/savings-rate?days=${days}`),
+
+  // money pits
+  listMoneyPits: (): Promise<MoneyPitFlag[]> => get("/api/money-pits"),
+  dismissMoneyPit: (id: number): Promise<{ ok: true }> => post(`/api/money-pits/${id}/dismiss`),
+  setMoneyPitNote: (id: number, note: string): Promise<{ ok: true }> => post(`/api/money-pits/${id}/utilization-note`, { note }),
 };
