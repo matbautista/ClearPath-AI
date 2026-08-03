@@ -358,9 +358,9 @@ button.secondary:hover:not(:disabled) {
 }
 
 .app-brand-logo {
-  height: 44px;
+  height: 60px;
   width: auto;
-  border-radius: 4px;
+  border-radius: 6px;
 }
 
 .app-nav-links {
