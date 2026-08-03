@@ -337,10 +337,11 @@ button.secondary:hover:not(:disabled) {
 
 .auth-logo {
   display: block;
-  height: 48px;
-  width: auto;
-  margin: 0 0 20px;
-  border-radius: 6px;
+  width: 100%;
+  max-width: 280px;
+  height: auto;
+  margin: 0 0 24px;
+  border-radius: 8px;
 }
 
 .auth-card .page-subtitle {
