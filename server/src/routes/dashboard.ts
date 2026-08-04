@@ -14,6 +14,7 @@ dashboardRouter.get("/summary", (_req, res) => {
     totalCashInBankMinor: totals.Bank,
     totalEWalletMinor: totals.EWallet,
     totalInvestmentValueMinor: totals.Investment,
+    totalRealEstateValueMinor: totals.RealEstate,
     totalLoanBalanceMinor: totals.Loan,
     totalCardBalanceMinor: totals.CreditCard,
     ...netWorth,

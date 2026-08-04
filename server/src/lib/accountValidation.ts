@@ -2,7 +2,7 @@
 // spec 2.1) but with per-field, human-readable errors instead of a raw
 // SQLite CHECK failure.
 
-export type AccountType = "Cash" | "Bank" | "EWallet" | "Investment" | "Loan" | "CreditCard";
+export type AccountType = "Cash" | "Bank" | "EWallet" | "Investment" | "Loan" | "CreditCard" | "RealEstate";
 
 export interface AccountInput {
   accountType: AccountType;

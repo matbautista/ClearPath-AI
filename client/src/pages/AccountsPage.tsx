@@ -4,7 +4,7 @@ import { formatMinor, toMinorUnits } from "../lib/money";
 import { useSettings } from "../SettingsContext";
 import type { Account, AccountStatus, AccountType, NewAccountInput } from "../types";
 
-const ACCOUNT_TYPES: AccountType[] = ["Cash", "Bank", "EWallet", "Investment", "Loan", "CreditCard"];
+const ACCOUNT_TYPES: AccountType[] = ["Cash", "Bank", "EWallet", "Investment", "Loan", "CreditCard", "RealEstate"];
 
 const TYPE_LABELS: Record<AccountType, string> = {
   Cash: "Cash",
@@ -13,6 +13,7 @@ const TYPE_LABELS: Record<AccountType, string> = {
   Investment: "Investment",
   Loan: "Loan",
   CreditCard: "Credit Card",
+  RealEstate: "Real Estate",
 };
 
 type FormState = Partial<NewAccountInput> & { accountType: AccountType; status?: AccountStatus };
@@ -29,6 +30,8 @@ export function AccountsPage() {
   const [formErrors, setFormErrors] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [typeFilter, setTypeFilter] = useState<AccountType | "All">("All");
+  const [statusFilter, setStatusFilter] = useState<AccountStatus | "All">("All");
 
   function load() {
     setLoading(true);
@@ -99,6 +102,32 @@ export function AccountsPage() {
     }
   }
 
+  // A Loan sitting at a zero balance isn't auto-closed anywhere (nothing in
+  // the schema or the recurring/dashboard jobs watches for this) — left
+  // alone, it stays "Active" forever and keeps showing up in the
+  // Dashboard's Upcoming Dues with its old minimum payment amount, even
+  // though nothing is actually owed. This just flags it so the user
+  // notices and can close it themselves.
+  function isPaidOffLoan(account: Account): boolean {
+    return account.accountType === "Loan" && account.status === "Active" && (account.currentBalanceMinor ?? 0) === 0;
+  }
+
+  async function closeAccount(account: Account) {
+    await api.updateAccount(account.id, {
+      accountName: account.accountName,
+      institutionName: account.institutionName ?? undefined,
+      beginningBalanceMinor: account.beginningBalanceMinor,
+      interestRatePct: account.interestRatePct ?? undefined,
+      minimumPaymentMinor: account.minimumPaymentMinor ?? undefined,
+      creditLimitMinor: account.creditLimitMinor ?? undefined,
+      loanAmountMinor: account.loanAmountMinor ?? undefined,
+      dueDateDay: account.dueDateDay ?? undefined,
+      cutOffDateDay: account.cutOffDateDay ?? undefined,
+      status: "Closed",
+    });
+    load();
+  }
+
   function balanceDisplay(account: Account) {
     if (account.accountType === "CreditCard") {
       return (
@@ -116,8 +145,13 @@ export function AccountsPage() {
   const isCreditCard = form.accountType === "CreditCard";
   const isLoan = form.accountType === "Loan";
   const isLoanOrCard = isLoan || isCreditCard;
+  const isRealEstate = form.accountType === "RealEstate";
   const editingAccount = editingId != null ? accounts.find((a) => a.id === editingId) ?? null : null;
   const balanceIsCorrectable = editingId == null || editingAccount?.hasTransactions === false;
+
+  const filteredAccounts = accounts.filter(
+    (a) => (typeFilter === "All" || a.accountType === typeFilter) && (statusFilter === "All" || a.status === statusFilter)
+  );
 
   return (
     <div className="page">
@@ -130,11 +164,37 @@ export function AccountsPage() {
       </header>
 
       <section className="accounts-list">
+        {!loading && accounts.length > 0 && (
+          <div className="field-row" style={{ marginBottom: 20 }}>
+            <label>
+              Filter by type
+              <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value as AccountType | "All")}>
+                <option value="All">All types</option>
+                {ACCOUNT_TYPES.map((t) => (
+                  <option key={t} value={t}>
+                    {TYPE_LABELS[t]}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Filter by status
+              <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as AccountStatus | "All")}>
+                <option value="All">All statuses</option>
+                <option value="Active">Active</option>
+                <option value="Closed">Closed</option>
+              </select>
+            </label>
+          </div>
+        )}
         {loading ? (
           <p className="muted">Loading…</p>
         ) : accounts.length === 0 ? (
           <p className="muted">No accounts yet — add your first one below.</p>
+        ) : filteredAccounts.length === 0 ? (
+          <p className="muted">No accounts match this filter.</p>
         ) : (
+          <div className="table-scroll">
           <table>
             <thead>
               <tr>
@@ -147,7 +207,7 @@ export function AccountsPage() {
               </tr>
             </thead>
             <tbody>
-              {accounts.map((a) => (
+              {filteredAccounts.map((a) => (
                 <tr key={a.id}>
                   <td>{a.accountName}</td>
                   <td>{TYPE_LABELS[a.accountType]}</td>
@@ -155,16 +215,23 @@ export function AccountsPage() {
                   <td className="numeric">{balanceDisplay(a)}</td>
                   <td>
                     <span className={`status-pill status-${a.status.toLowerCase()}`}>{a.status}</span>
+                    {isPaidOffLoan(a) && <div className="muted paid-off-note">Paid off</div>}
                   </td>
-                  <td>
-                    <button type="button" onClick={() => startEdit(a)}>
+                  <td className="row-actions">
+                    <button type="button" className="secondary" onClick={() => startEdit(a)}>
                       Edit
                     </button>
+                    {isPaidOffLoan(a) && (
+                      <button type="button" className="secondary" onClick={() => closeAccount(a)} style={{ marginLeft: 6 }}>
+                        Close account
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </section>
 
@@ -192,10 +259,18 @@ export function AccountsPage() {
                 type="text"
                 value={form.accountName ?? ""}
                 onChange={(e) => setForm({ ...form, accountName: e.target.value })}
-                placeholder={form.accountType === "Cash" ? "e.g. Wallet" : form.accountType === "EWallet" ? "e.g. GCash" : "e.g. BPI Savings"}
+                placeholder={
+                  form.accountType === "Cash"
+                    ? "e.g. Wallet"
+                    : form.accountType === "EWallet"
+                      ? "e.g. GCash"
+                      : isRealEstate
+                        ? "e.g. Family Home"
+                        : "e.g. BPI Savings"
+                }
               />
             </label>
-            {form.accountType !== "Cash" && (
+            {form.accountType !== "Cash" && !isRealEstate && (
               <label>
                 Institution
                 <input
@@ -222,7 +297,7 @@ export function AccountsPage() {
           <div className="field-row">
             {balanceIsCorrectable && (
               <label>
-                {isCreditCard ? "Current balance owed" : "Beginning balance"}
+                {isCreditCard ? "Current balance owed" : isRealEstate ? "Current market value" : "Beginning balance"}
                 <input
                   type="number"
                   step="0.01"
@@ -363,7 +438,7 @@ export function AccountsPage() {
             {submitting ? "Saving…" : editingId != null ? "Save changes" : "Add account"}
           </button>
           {editingId != null && (
-            <button type="button" onClick={resetForm}>
+            <button type="button" className="secondary" onClick={resetForm} style={{ marginLeft: 8 }}>
               Cancel
             </button>
           )}

@@ -169,6 +169,7 @@ export function TransactionsPage() {
         ) : transactions.length === 0 ? (
           <p className="muted">No transactions yet.</p>
         ) : (
+          <div className="table-scroll">
           <table>
             <thead>
               <tr>
@@ -208,6 +209,7 @@ export function TransactionsPage() {
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </section>
 

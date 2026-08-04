@@ -114,6 +114,78 @@ function migrateAccountsAddEWallet() {
   }
 }
 
+// Same rebuild dance as migrateAccountsAddEWallet above (see its comment
+// for why: SQLite can't ALTER a CHECK constraint in place, and renaming
+// accounts away — even temporarily — corrupts every other table's FK). A
+// RealEstate account behaves like Cash/Bank: no transaction type ever
+// targets it (schema.sql's Loan/CreditCard/Investment-only field CHECKs
+// already fall through correctly for it), so its value is set at creation
+// and from then on only correctable by editing Beginning Balance — that's
+// the intended way to keep a home's value current (2.1 has no periodic
+// revaluation transaction, matching how Investment accounts already work).
+function migrateAccountsAddRealEstate() {
+  const row = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='accounts'").get() as
+    | { sql: string }
+    | undefined;
+  if (!row || row.sql.includes("'RealEstate'")) return;
+
+  console.log("[db] migration: adding 'RealEstate' to accounts.account_type");
+  db.exec("PRAGMA foreign_keys = OFF");
+  db.exec("BEGIN");
+  try {
+    db.exec(`
+      CREATE TABLE accounts_new (
+          id                       INTEGER PRIMARY KEY,
+          account_type             TEXT NOT NULL CHECK (account_type IN ('Cash','Bank','EWallet','Investment','Loan','CreditCard','RealEstate')),
+          institution_name         TEXT,
+          description              TEXT,
+          account_number_encrypted BLOB,
+          account_name             TEXT NOT NULL,
+          beginning_balance_minor  INTEGER NOT NULL DEFAULT 0,
+          current_balance_minor    INTEGER NOT NULL DEFAULT 0,
+          card_balance_minor       INTEGER NOT NULL DEFAULT 0,
+          interest_rate_pct        REAL,
+          valuation_method         TEXT CHECK (valuation_method IN ('CostBasis','MarketValue')),
+          minimum_payment_minor    INTEGER,
+          credit_limit_minor       INTEGER,
+          loan_amount_minor        INTEGER,
+          loan_term_months         INTEGER,
+          due_date_day             INTEGER CHECK (due_date_day BETWEEN 1 AND 31),
+          cut_off_date_day         INTEGER CHECK (cut_off_date_day BETWEEN 1 AND 31),
+          reminder_lead_time_days  INTEGER,
+          status                   TEXT NOT NULL DEFAULT 'Active' CHECK (status IN ('Active','Closed')),
+          created_at                TEXT NOT NULL DEFAULT (datetime('now')),
+          updated_at                TEXT NOT NULL DEFAULT (datetime('now')),
+          CHECK (
+              (account_type = 'CreditCard' AND credit_limit_minor IS NOT NULL)
+              OR (account_type != 'CreditCard' AND credit_limit_minor IS NULL AND cut_off_date_day IS NULL)
+          ),
+          CHECK (
+              (account_type = 'Loan' AND loan_amount_minor IS NOT NULL)
+              OR (account_type != 'Loan')
+          ),
+          CHECK (
+              account_type IN ('Loan','CreditCard') OR (interest_rate_pct IS NULL AND minimum_payment_minor IS NULL AND reminder_lead_time_days IS NULL AND due_date_day IS NULL)
+          ),
+          CHECK (
+              account_type = 'Investment' OR valuation_method IS NULL
+          )
+      )
+    `);
+    db.exec("INSERT INTO accounts_new SELECT * FROM accounts");
+    db.exec("DROP TABLE accounts");
+    db.exec("ALTER TABLE accounts_new RENAME TO accounts");
+    db.exec("CREATE INDEX idx_accounts_type_status ON accounts(account_type, status)");
+    db.exec("COMMIT");
+    console.log("[db] migration: accounts table rebuilt with RealEstate support");
+  } catch (err) {
+    db.exec("ROLLBACK");
+    throw err;
+  } finally {
+    db.exec("PRAGMA foreign_keys = ON");
+  }
+}
+
 // One-time repair for a DB that already hit the rename-then-drop bug
 // described above: any table whose stored schema still says
 // `REFERENCES "accounts_old"(id)` gets rebuilt with that fixed back to
@@ -174,8 +246,25 @@ function runMigrations() {
     db.exec("ALTER TABLE utilities ADD COLUMN policy_type TEXT");
     console.log("[db] migration: added utilities.policy_type");
   }
+  if (!utilityColumns.some((c) => c.name === "status")) {
+    db.exec("ALTER TABLE utilities ADD COLUMN status TEXT NOT NULL DEFAULT 'Active' CHECK (status IN ('Active','Paused'))");
+    console.log("[db] migration: added utilities.status");
+  }
+
+  const incomeSourceColumns = db.prepare("PRAGMA table_info(income_sources)").all() as { name: string }[];
+  if (!incomeSourceColumns.some((c) => c.name === "status")) {
+    db.exec("ALTER TABLE income_sources ADD COLUMN status TEXT NOT NULL DEFAULT 'Active' CHECK (status IN ('Active','Paused'))");
+    console.log("[db] migration: added income_sources.status");
+  }
+
+  const taxFeeColumns = db.prepare("PRAGMA table_info(tax_fees)").all() as { name: string }[];
+  if (!taxFeeColumns.some((c) => c.name === "status")) {
+    db.exec("ALTER TABLE tax_fees ADD COLUMN status TEXT NOT NULL DEFAULT 'Active' CHECK (status IN ('Active','Paused'))");
+    console.log("[db] migration: added tax_fees.status");
+  }
 
   migrateAccountsAddEWallet();
+  migrateAccountsAddRealEstate();
   repairAccountsOldReferences();
 }
 

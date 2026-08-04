@@ -82,8 +82,22 @@ function createDraft(rule: RuleRow, txnDate: string) {
 }
 
 export function runDueRecurringRules(today: string = new Date().toISOString().slice(0, 10)): number {
+  // Paused utilities/income sources/tax fees (decommissioned subscriptions,
+  // e.g. Amazon Prime; an ended income source; a fee no longer owed) are
+  // excluded here rather than deleted — this both skips new drafts and
+  // leaves next_run_date frozen where it was, so nothing to "catch up" on
+  // once un-paused (see fastForwardPausedRule).
   const rules = db
-    .prepare(`SELECT * FROM recurring_rules WHERE schedule != 'Variable' AND next_run_date IS NOT NULL AND next_run_date <= ?`)
+    .prepare(
+      `SELECT rr.* FROM recurring_rules rr
+       LEFT JOIN utilities u ON u.id = rr.utility_id
+       LEFT JOIN income_sources i ON i.id = rr.income_source_id
+       LEFT JOIN tax_fees t ON t.id = rr.tax_fee_id
+       WHERE rr.schedule != 'Variable' AND rr.next_run_date IS NOT NULL AND rr.next_run_date <= ?
+         AND (u.id IS NULL OR u.status = 'Active')
+         AND (i.id IS NULL OR i.status = 'Active')
+         AND (t.id IS NULL OR t.status = 'Active')`
+    )
     .all(today) as unknown as RuleRow[];
 
   let generated = 0;
@@ -97,6 +111,32 @@ export function runDueRecurringRules(today: string = new Date().toISOString().sl
     db.prepare("UPDATE recurring_rules SET next_run_date = ?, updated_at = datetime('now') WHERE id = ?").run(nextRun, rule.id);
   }
   return generated;
+}
+
+// Called when a utility/income source/tax fee comes off Pause. Its
+// recurring_rules.next_run_date was frozen at whatever it was when paused
+// (possibly months in the past) — advance it to the next real cycle >=
+// today WITHOUT generating drafts for the paused span, since resuming
+// shouldn't back-bill (or back-pay, for income sources).
+export function fastForwardPausedRule(
+  linkedTo: { utilityId: number } | { incomeSourceId: number } | { taxFeeId: number },
+  today: string = new Date().toISOString().slice(0, 10)
+) {
+  const [column, id] =
+    "utilityId" in linkedTo
+      ? (["utility_id", linkedTo.utilityId] as const)
+      : "incomeSourceId" in linkedTo
+        ? (["income_source_id", linkedTo.incomeSourceId] as const)
+        : (["tax_fee_id", linkedTo.taxFeeId] as const);
+
+  const rule = db
+    .prepare(`SELECT id, schedule, next_run_date FROM recurring_rules WHERE ${column} = ?`)
+    .get(id) as { id: number; schedule: Schedule; next_run_date: string | null } | undefined;
+  if (!rule || rule.schedule === "Variable" || !rule.next_run_date) return;
+
+  let nextRun = rule.next_run_date;
+  while (nextRun <= today) nextRun = advanceCycle(nextRun, rule.schedule);
+  db.prepare("UPDATE recurring_rules SET next_run_date = ?, updated_at = datetime('now') WHERE id = ?").run(nextRun, rule.id);
 }
 
 export class PendingTransactionError extends Error {}

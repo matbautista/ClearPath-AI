@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { db } from "../db.js";
 import { INCOME_CATEGORIES } from "../lib/transactionRules.js";
+import { fastForwardPausedRule } from "../lib/recurringEngine.js";
 
 export const incomeSourcesRouter = Router();
 
@@ -24,6 +25,7 @@ incomeSourcesRouter.get("/", (_req, res) => {
       incomeCategory: r.income_category,
       creditToAccountId: r.credit_to_account_id,
       creditToAccountName: r.credit_to_account_name,
+      status: r.status,
       recurringRuleId: r.rule_id,
       schedule: r.schedule,
       templateAmountMinor: r.template_amount_minor,
@@ -115,4 +117,21 @@ incomeSourcesRouter.patch("/:id", (req, res) => {
     db.exec("ROLLBACK");
     res.status(500).json({ errors: [(err as Error).message] });
   }
+});
+
+// PATCH /api/income-sources/:id/status — pause/resume, e.g. a contract or
+// gig that ended. Mirrors utilities.ts's status endpoint: the recurring job
+// stops drafting deposits and it drops off Upcoming Dues, but history and
+// the record itself stay intact for reactivation later.
+incomeSourcesRouter.patch("/:id/status", (req, res) => {
+  const { status } = req.body as { status?: string };
+  if (status !== "Active" && status !== "Paused") return res.status(422).json({ errors: ["Status must be 'Active' or 'Paused'."] });
+
+  const existing = db.prepare("SELECT id FROM income_sources WHERE id = ?").get(req.params.id);
+  if (!existing) return res.status(404).json({ errors: ["Income source not found."] });
+
+  db.prepare("UPDATE income_sources SET status = ? WHERE id = ?").run(status, req.params.id);
+  if (status === "Active") fastForwardPausedRule({ incomeSourceId: Number(req.params.id) });
+
+  res.json({ ok: true });
 });

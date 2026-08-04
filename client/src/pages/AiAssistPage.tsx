@@ -86,6 +86,7 @@ export function AiAssistPage() {
                 )}
 
                 <h2>History</h2>
+                <div className="table-scroll">
                 <table>
                   <thead>
                     <tr>
@@ -104,6 +105,7 @@ export function AiAssistPage() {
                     ))}
                   </tbody>
                 </table>
+                </div>
               </>
             )}
           </section>

@@ -5,7 +5,7 @@
 // which direction (Debit/Credit) each leg moves in, and what category
 // kind (spending / income / none) applies.
 
-export type AccountType = "Cash" | "Bank" | "EWallet" | "Investment" | "Loan" | "CreditCard";
+export type AccountType = "Cash" | "Bank" | "EWallet" | "Investment" | "Loan" | "CreditCard" | "RealEstate";
 export type Indicator = "Debit" | "Credit";
 export type CategoryKind = "spending" | "income" | "none";
 

@@ -174,6 +174,7 @@ export interface Utility {
   cutOffDateDay: number | null;
   dueDateDay: number | null;
   policyType: string | null;
+  status: "Active" | "Paused";
   recurringRuleId: number;
   schedule: Schedule;
   templateAmountMinor: number;
@@ -203,6 +204,7 @@ export interface IncomeSource {
   incomeCategory: string;
   creditToAccountId: number;
   creditToAccountName: string;
+  status: "Active" | "Paused";
   recurringRuleId: number;
   schedule: Schedule;
   templateAmountMinor: number;
@@ -228,6 +230,7 @@ export interface TaxFee {
   feeCategory: string | null;
   debitFromAccountId: number;
   debitFromAccountName: string;
+  status: "Active" | "Paused";
   recurringRuleId: number;
   schedule: Schedule;
   templateAmountMinor: number;
@@ -258,6 +261,7 @@ export interface DashboardSummary {
   totalCashInBankMinor: number;
   totalEWalletMinor: number;
   totalInvestmentValueMinor: number;
+  totalRealEstateValueMinor: number;
   totalLoanBalanceMinor: number;
   totalCardBalanceMinor: number;
   totalAssetsMinor: number;
@@ -359,12 +363,16 @@ export const api = {
   listUtilities: (): Promise<Utility[]> => get("/api/utilities"),
   createUtility: (input: NewUtilityInput): Promise<{ id: number }> => post("/api/utilities", input),
   updateUtility: (id: number, input: NewUtilityInput): Promise<{ ok: true }> => patch(`/api/utilities/${id}`, input),
+  setUtilityStatus: (id: number, status: "Active" | "Paused"): Promise<{ ok: true }> => patch(`/api/utilities/${id}/status`, { status }),
   listIncomeSources: (): Promise<IncomeSource[]> => get("/api/income-sources"),
   createIncomeSource: (input: NewIncomeSourceInput): Promise<{ id: number }> => post("/api/income-sources", input),
   updateIncomeSource: (id: number, input: NewIncomeSourceInput): Promise<{ ok: true }> => patch(`/api/income-sources/${id}`, input),
+  setIncomeSourceStatus: (id: number, status: "Active" | "Paused"): Promise<{ ok: true }> =>
+    patch(`/api/income-sources/${id}/status`, { status }),
   listTaxFees: (): Promise<TaxFee[]> => get("/api/tax-fees"),
   createTaxFee: (input: NewTaxFeeInput): Promise<{ id: number }> => post("/api/tax-fees", input),
   updateTaxFee: (id: number, input: NewTaxFeeInput): Promise<{ ok: true }> => patch(`/api/tax-fees/${id}`, input),
+  setTaxFeeStatus: (id: number, status: "Active" | "Paused"): Promise<{ ok: true }> => patch(`/api/tax-fees/${id}/status`, { status }),
   listPending: (): Promise<PendingTransaction[]> => get("/api/recurring/pending"),
   confirmPending: (id: number, amountMinor?: number): Promise<{ ok: true }> =>
     post(`/api/recurring/pending/${id}/confirm`, amountMinor != null ? { amountMinor } : {}),

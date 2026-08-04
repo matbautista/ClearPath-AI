@@ -19,10 +19,17 @@ if errorlevel 1 (
 )
 
 echo.
+echo Your PC's IPv4 addresses (look for your Wi-Fi/LAN adapter's, ignore 127.0.0.1):
+ipconfig | findstr /R /C:"IPv4 Address"
+echo.
 echo Starting ClearPath AI...
-echo Once you see "listening on http://127.0.0.1:4000", open that URL in your browser.
+echo   - On this PC:            http://127.0.0.1:4000
+echo   - On phone/tablet (same Wi-Fi): http://THE-IP-ABOVE:4000
+echo If this is the first run, Windows Firewall may prompt to allow node.exe
+echo through the firewall - choose "Private networks" only, then Allow.
 echo Close this window (or press Ctrl+C) to stop the server.
 echo.
+set HOST=0.0.0.0
 node server\dist\index.js
 
 echo.

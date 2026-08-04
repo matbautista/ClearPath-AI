@@ -108,7 +108,7 @@ CREATE TABLE settings (
 -- =========================================================================
 CREATE TABLE accounts (
     id                       INTEGER PRIMARY KEY,
-    account_type             TEXT NOT NULL CHECK (account_type IN ('Cash','Bank','EWallet','Investment','Loan','CreditCard')),
+    account_type             TEXT NOT NULL CHECK (account_type IN ('Cash','Bank','EWallet','Investment','Loan','CreditCard','RealEstate')),
     institution_name         TEXT,                          -- blank for Cash
     description              TEXT,
     account_number_encrypted BLOB,
@@ -249,6 +249,7 @@ CREATE TABLE utilities (
     cut_off_date_day         INTEGER CHECK (cut_off_date_day BETWEEN 1 AND 31),
     due_date_day             INTEGER CHECK (due_date_day BETWEEN 1 AND 31),
     policy_type              TEXT,                          -- freeform, e.g. 'Life', 'Health', 'Auto' — only meaningful for insurance-type Utilities; NULL for electricity/water/etc.
+    status                   TEXT NOT NULL DEFAULT 'Active' CHECK (status IN ('Active','Paused')), -- Paused = cancelled/on-hold subscription: no auto-drafts, doesn't show in Upcoming Dues, history kept
     created_at                TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -261,6 +262,7 @@ CREATE TABLE income_sources (
                                 'Capital Gains','Allowances','Tax Credits'
                             )),
     credit_to_account_id   INTEGER NOT NULL REFERENCES accounts(id), -- (3.8 "Credit To")
+    status                 TEXT NOT NULL DEFAULT 'Active' CHECK (status IN ('Active','Paused')), -- Paused = source stopped (e.g. contract ended): no auto-drafts, doesn't show in Upcoming Dues, history kept
     created_at              TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -270,6 +272,7 @@ CREATE TABLE tax_fees (
     description             TEXT,
     fee_category            TEXT,
     debit_from_account_id  INTEGER NOT NULL REFERENCES accounts(id), -- (3.9 "Debit From")
+    status                 TEXT NOT NULL DEFAULT 'Active' CHECK (status IN ('Active','Paused')), -- Paused = no longer owed: no auto-drafts, doesn't show in Upcoming Dues, history kept
     created_at              TEXT NOT NULL DEFAULT (datetime('now'))
 );
 

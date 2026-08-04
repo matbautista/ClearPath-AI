@@ -49,6 +49,7 @@ function PendingPanel({ pending, onChange }: { pending: PendingTransaction[]; on
         Auto-drafted from your Recurring Rules (2.7) — nothing here has touched your account
         balances yet. Confirm to post it, or skip to discard.
       </p>
+      <div className="table-scroll">
       <table>
         <thead>
           <tr>
@@ -86,6 +87,7 @@ function PendingPanel({ pending, onChange }: { pending: PendingTransaction[]; on
           ))}
         </tbody>
       </table>
+      </div>
     </section>
   );
 }
@@ -213,6 +215,11 @@ function UtilitiesSection({
     window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
   }
 
+  async function toggleStatus(u: Utility) {
+    await api.setUtilityStatus(u.id, u.status === "Active" ? "Paused" : "Active");
+    onChange();
+  }
+
   // "Day of month" only unambiguously identifies a date for schedules that
   // recur every month — Quarterly/Annually/Variable utilities would need a
   // month too, and since these fields aren't used to compute due dates
@@ -256,6 +263,7 @@ function UtilitiesSection({
         {utilities.length === 0 ? (
           <p className="muted">No utilities yet — add your first one below.</p>
         ) : (
+          <div className="table-scroll">
           <table>
             <thead>
               <tr>
@@ -265,27 +273,33 @@ function UtilitiesSection({
                 <th>Schedule</th>
                 <th className="numeric">Amount</th>
                 <th>Next run</th>
+                <th>Status</th>
                 <th></th>
               </tr>
             </thead>
             <tbody>
               {utilities.map((u) => (
-                <tr key={u.id}>
+                <tr key={u.id} style={u.status === "Paused" ? { opacity: 0.6 } : undefined}>
                   <td>{u.providerName}</td>
                   <td className="muted">{u.policyType ?? "—"}</td>
                   <td className="muted">{u.defaultAccountName}</td>
                   <td className="muted">{u.schedule}</td>
                   <td className="numeric">{formatMinor(u.templateAmountMinor, baseCurrency)}</td>
-                  <td className="muted">{u.nextRunDate ?? "—"}</td>
-                  <td>
+                  <td className="muted">{u.status === "Paused" ? "—" : u.nextRunDate ?? "—"}</td>
+                  <td className="muted">{u.status === "Paused" ? "Paused" : "Active"}</td>
+                  <td className="row-actions">
                     <button type="button" className="secondary" onClick={() => startEdit(u)}>
                       Edit
+                    </button>
+                    <button type="button" className="secondary" onClick={() => toggleStatus(u)} style={{ marginLeft: 6 }}>
+                      {u.status === "Paused" ? "Resume" : "Pause"}
                     </button>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </section>
 
@@ -420,6 +434,11 @@ function IncomeSourcesSection({
     window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
   }
 
+  async function toggleStatus(i: IncomeSource) {
+    await api.setIncomeSourceStatus(i.id, i.status === "Active" ? "Paused" : "Active");
+    onChange();
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (creditToAccountId === "" || templateAmount === "") return;
@@ -452,6 +471,7 @@ function IncomeSourcesSection({
         {incomeSources.length === 0 ? (
           <p className="muted">No income sources yet — add your first one below.</p>
         ) : (
+          <div className="table-scroll">
           <table>
             <thead>
               <tr>
@@ -461,27 +481,33 @@ function IncomeSourcesSection({
                 <th>Schedule</th>
                 <th className="numeric">Amount</th>
                 <th>Next run</th>
+                <th>Status</th>
                 <th></th>
               </tr>
             </thead>
             <tbody>
               {incomeSources.map((i) => (
-                <tr key={i.id}>
+                <tr key={i.id} style={i.status === "Paused" ? { opacity: 0.6 } : undefined}>
                   <td>{i.sourceName}</td>
                   <td className="muted">{i.incomeCategory}</td>
                   <td className="muted">{i.creditToAccountName}</td>
                   <td className="muted">{i.schedule}</td>
                   <td className="numeric">{formatMinor(i.templateAmountMinor, baseCurrency)}</td>
-                  <td className="muted">{i.nextRunDate ?? "—"}</td>
-                  <td>
+                  <td className="muted">{i.status === "Paused" ? "—" : i.nextRunDate ?? "—"}</td>
+                  <td className="muted">{i.status === "Paused" ? "Paused" : "Active"}</td>
+                  <td className="row-actions">
                     <button type="button" className="secondary" onClick={() => startEdit(i)}>
                       Edit
+                    </button>
+                    <button type="button" className="secondary" onClick={() => toggleStatus(i)} style={{ marginLeft: 6 }}>
+                      {i.status === "Paused" ? "Resume" : "Pause"}
                     </button>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </section>
 
@@ -599,6 +625,11 @@ function TaxFeesSection({
     window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
   }
 
+  async function toggleStatus(t: TaxFee) {
+    await api.setTaxFeeStatus(t.id, t.status === "Active" ? "Paused" : "Active");
+    onChange();
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (debitFromAccountId === "" || templateAmount === "") return;
@@ -631,6 +662,7 @@ function TaxFeesSection({
         {taxFees.length === 0 ? (
           <p className="muted">No taxes/fees yet — add your first one below.</p>
         ) : (
+          <div className="table-scroll">
           <table>
             <thead>
               <tr>
@@ -639,26 +671,32 @@ function TaxFeesSection({
                 <th>Schedule</th>
                 <th className="numeric">Amount</th>
                 <th>Next run</th>
+                <th>Status</th>
                 <th></th>
               </tr>
             </thead>
             <tbody>
               {taxFees.map((t) => (
-                <tr key={t.id}>
+                <tr key={t.id} style={t.status === "Paused" ? { opacity: 0.6 } : undefined}>
                   <td>{t.regulatoryName}</td>
                   <td className="muted">{t.debitFromAccountName}</td>
                   <td className="muted">{t.schedule}</td>
                   <td className="numeric">{formatMinor(t.templateAmountMinor, baseCurrency)}</td>
-                  <td className="muted">{t.nextRunDate ?? "—"}</td>
-                  <td>
+                  <td className="muted">{t.status === "Paused" ? "—" : t.nextRunDate ?? "—"}</td>
+                  <td className="muted">{t.status === "Paused" ? "Paused" : "Active"}</td>
+                  <td className="row-actions">
                     <button type="button" className="secondary" onClick={() => startEdit(t)}>
                       Edit
+                    </button>
+                    <button type="button" className="secondary" onClick={() => toggleStatus(t)} style={{ marginLeft: 6 }}>
+                      {t.status === "Paused" ? "Resume" : "Pause"}
                     </button>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </section>
 

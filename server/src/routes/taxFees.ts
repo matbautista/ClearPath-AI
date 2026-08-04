@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { db } from "../db.js";
+import { fastForwardPausedRule } from "../lib/recurringEngine.js";
 
 export const taxFeesRouter = Router();
 
@@ -23,6 +24,7 @@ taxFeesRouter.get("/", (_req, res) => {
       feeCategory: r.fee_category,
       debitFromAccountId: r.debit_from_account_id,
       debitFromAccountName: r.debit_from_account_name,
+      status: r.status,
       recurringRuleId: r.rule_id,
       schedule: r.schedule,
       templateAmountMinor: r.template_amount_minor,
@@ -109,4 +111,21 @@ taxFeesRouter.patch("/:id", (req, res) => {
     db.exec("ROLLBACK");
     res.status(500).json({ errors: [(err as Error).message] });
   }
+});
+
+// PATCH /api/tax-fees/:id/status — pause/resume, e.g. a fee that no longer
+// applies. Mirrors utilities.ts's status endpoint: the recurring job stops
+// drafting payments and it drops off Upcoming Dues, but history and the
+// record itself stay intact for reactivation later.
+taxFeesRouter.patch("/:id/status", (req, res) => {
+  const { status } = req.body as { status?: string };
+  if (status !== "Active" && status !== "Paused") return res.status(422).json({ errors: ["Status must be 'Active' or 'Paused'."] });
+
+  const existing = db.prepare("SELECT id FROM tax_fees WHERE id = ?").get(req.params.id);
+  if (!existing) return res.status(404).json({ errors: ["Tax/fee not found."] });
+
+  db.prepare("UPDATE tax_fees SET status = ? WHERE id = ?").run(status, req.params.id);
+  if (status === "Active") fastForwardPausedRule({ taxFeeId: Number(req.params.id) });
+
+  res.json({ ok: true });
 });

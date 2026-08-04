@@ -139,6 +139,14 @@ section h2 {
   color: var(--brand-navy);
 }
 
+/* Every table sits in one of these so a wide table (many columns, or a
+   narrow phone screen) scrolls sideways within itself — never the whole
+   page. Without this, a table wider than the viewport drags the nav bar
+   and everything else along with it when you scroll right. */
+.table-scroll {
+  overflow-x: auto;
+}
+
 table {
   width: 100%;
   border-collapse: collapse;
@@ -149,6 +157,14 @@ th, td {
   padding: 10px 12px;
   border-bottom: 1px solid var(--border);
   font-size: 0.9rem;
+}
+
+/* Keeps a row's action buttons (Edit / Pause-Resume) on one line instead
+   of wrapping — otherwise the more data-dense tables (Utilities, Income
+   Sources) squeeze this column narrower than Taxes' does and the buttons
+   stack. */
+td.row-actions {
+  white-space: nowrap;
 }
 
 th {
@@ -188,6 +204,11 @@ tr:last-child td {
 .status-active {
   background: var(--status-active-bg);
   color: var(--status-active-text);
+}
+
+.paid-off-note {
+  font-size: 0.78rem;
+  margin-top: 4px;
 }
 
 .status-closed, .status-abandoned {
@@ -500,7 +521,17 @@ button.secondary:hover:not(:disabled) {
   width: 90px;
 }
 
-.goal-actions button {
+/* One shared size/weight for every inline row-action button (table Edit/
+   Void/Pause-Resume, goal Abandon/Link, money pit Dismiss, pending-callout
+   Review) — kept in one place instead of a slightly-different override per
+   page so they all read as the same control. Primary form submit buttons
+   (Save/Add) and their adjacent Cancel intentionally stay full-size (the
+   default `button`/`button.secondary`) since they're the primary action on
+   a page, not a dense row/list action. */
+table td button,
+.goal-actions button,
+.money-pit-item button,
+.pending-callout button {
   padding: 6px 12px;
   font-size: 0.85rem;
 }
@@ -539,11 +570,6 @@ button.secondary:hover:not(:disabled) {
   border-width: 1.5px;
 }
 
-.pending-panel table button {
-  padding: 4px 10px;
-  font-size: 0.8rem;
-}
-
 /* --- Dashboard --- */
 .pending-callout {
   display: flex;
@@ -560,8 +586,6 @@ button.secondary:hover:not(:disabled) {
 
 .pending-callout button {
   flex-shrink: 0;
-  padding: 6px 14px;
-  font-size: 0.85rem;
 }
 
 .stat-tile-row {
@@ -725,6 +749,4 @@ button.secondary:hover:not(:disabled) {
 
 .money-pit-item button {
   flex-shrink: 0;
-  padding: 4px 10px;
-  font-size: 0.8rem;
 }

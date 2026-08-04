@@ -119,6 +119,7 @@ export function DashboardPage({ onNavigateToRecurring }: { onNavigateToRecurring
         <StatTile label="Cash in Bank" valueMinor={summary.totalCashInBankMinor} currency={baseCurrency} />
         <StatTile label="E-Wallets" valueMinor={summary.totalEWalletMinor} currency={baseCurrency} />
         <StatTile label="Investments" valueMinor={summary.totalInvestmentValueMinor} currency={baseCurrency} />
+        <StatTile label="Real Estate" valueMinor={summary.totalRealEstateValueMinor} currency={baseCurrency} />
         <StatTile label="Loan Balance" valueMinor={summary.totalLoanBalanceMinor} currency={baseCurrency} />
         <StatTile label="Card Balance" valueMinor={summary.totalCardBalanceMinor} currency={baseCurrency} />
         <StatTile label="Net Worth" valueMinor={summary.netWorthMinor} currency={baseCurrency} emphasis />

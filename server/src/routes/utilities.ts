@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { db } from "../db.js";
 import { TXN_RULES } from "../lib/transactionRules.js";
+import { fastForwardPausedRule } from "../lib/recurringEngine.js";
 
 export const utilitiesRouter = Router();
 
@@ -34,6 +35,7 @@ utilitiesRouter.get("/", (_req, res) => {
       cutOffDateDay: r.cut_off_date_day,
       dueDateDay: r.due_date_day,
       policyType: r.policy_type,
+      status: r.status,
       recurringRuleId: r.rule_id,
       schedule: r.schedule,
       templateAmountMinor: r.template_amount_minor,
@@ -184,4 +186,23 @@ utilitiesRouter.patch("/:id", (req, res) => {
     db.exec("ROLLBACK");
     res.status(500).json({ errors: [(err as Error).message] });
   }
+});
+
+// PATCH /api/utilities/:id/status — pause/resume, e.g. a cancelled
+// subscription (Amazon Prime). Paused: the recurring job stops drafting
+// payments and it drops off Upcoming Dues, but the utility and its full
+// transaction history stay intact for reactivation later — unlike delete,
+// which doesn't exist here on purpose (see utility_id having no ON DELETE
+// CASCADE from recurring_rules; a hard delete was never wired up).
+utilitiesRouter.patch("/:id/status", (req, res) => {
+  const { status } = req.body as { status?: string };
+  if (status !== "Active" && status !== "Paused") return res.status(422).json({ errors: ["Status must be 'Active' or 'Paused'."] });
+
+  const existing = db.prepare("SELECT id FROM utilities WHERE id = ?").get(req.params.id);
+  if (!existing) return res.status(404).json({ errors: ["Utility not found."] });
+
+  db.prepare("UPDATE utilities SET status = ? WHERE id = ?").run(status, req.params.id);
+  if (status === "Active") fastForwardPausedRule({ utilityId: Number(req.params.id) });
+
+  res.json({ ok: true });
 });

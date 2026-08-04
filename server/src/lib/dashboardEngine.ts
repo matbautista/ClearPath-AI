@@ -11,7 +11,7 @@ export function computeAccountTypeTotals(): Record<string, number> {
        FROM accounts WHERE status = 'Active' GROUP BY account_type`
     )
     .all() as { account_type: string; total: number }[];
-  const totals: Record<string, number> = { Cash: 0, Bank: 0, EWallet: 0, Investment: 0, Loan: 0, CreditCard: 0 };
+  const totals: Record<string, number> = { Cash: 0, Bank: 0, EWallet: 0, Investment: 0, Loan: 0, CreditCard: 0, RealEstate: 0 };
   for (const r of rows) totals[r.account_type] = r.total;
   return totals;
 }
@@ -87,12 +87,22 @@ export function computeUpcomingDues(withinDays = 30): UpcomingDue[] {
 
   const dues: UpcomingDue[] = [];
 
+  // Loans and Credit Cards are treated differently at zero balance: a Loan
+  // that hits 0 is paid off for good (loans don't replenish), so it drops
+  // out here regardless of status — nothing will ever be due on it again.
+  // A Credit Card at 0 is just between statement cycles and can pick up
+  // new charges before its next due date, so it stays in as long as it's
+  // Active; the balance check on Credit Card only exists to still surface
+  // a Closed card that somehow still owes money.
   const debtAccounts = db
     .prepare(
       `SELECT account_name, account_type, status, current_balance_minor, card_balance_minor, due_date_day, minimum_payment_minor
        FROM accounts
        WHERE account_type IN ('Loan', 'CreditCard') AND due_date_day IS NOT NULL
-         AND (status = 'Active' OR (account_type = 'CreditCard' AND card_balance_minor != 0) OR (account_type = 'Loan' AND current_balance_minor != 0))`
+         AND (
+           (account_type = 'CreditCard' AND (status = 'Active' OR card_balance_minor != 0))
+           OR (account_type = 'Loan' AND current_balance_minor != 0)
+         )`
     )
     .all() as any[];
   for (const a of debtAccounts) {
@@ -111,7 +121,7 @@ export function computeUpcomingDues(withinDays = 30): UpcomingDue[] {
     .prepare(
       `SELECT u.provider_name as label, rr.next_run_date, rr.template_amount_minor
        FROM recurring_rules rr JOIN utilities u ON u.id = rr.utility_id
-       WHERE rr.next_run_date IS NOT NULL AND rr.next_run_date <= ?`
+       WHERE rr.next_run_date IS NOT NULL AND rr.next_run_date <= ? AND u.status = 'Active'`
     )
     .all(horizonStr) as any[];
   for (const r of utilityRules) dues.push({ label: r.label, dueDate: r.next_run_date, amountMinor: r.template_amount_minor, source: "Utility" });
@@ -120,7 +130,7 @@ export function computeUpcomingDues(withinDays = 30): UpcomingDue[] {
     .prepare(
       `SELECT t.regulatory_name as label, rr.next_run_date, rr.template_amount_minor
        FROM recurring_rules rr JOIN tax_fees t ON t.id = rr.tax_fee_id
-       WHERE rr.next_run_date IS NOT NULL AND rr.next_run_date <= ?`
+       WHERE rr.next_run_date IS NOT NULL AND rr.next_run_date <= ? AND t.status = 'Active'`
     )
     .all(horizonStr) as any[];
   for (const r of taxRules) dues.push({ label: r.label, dueDate: r.next_run_date, amountMinor: r.template_amount_minor, source: "TaxFee" });

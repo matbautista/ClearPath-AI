@@ -158,6 +158,11 @@ accountsRouter.patch("/:id", (req, res) => {
   if (!existing) return res.status(404).json({ errors: ["Account not found."] });
 
   const body = req.body as Partial<AccountInput> & { status?: string };
+  // reminderLeadTimeDays/valuationMethod fall back to the existing stored
+  // value rather than clearing (unlike the other fields below, which the
+  // client always resends in full on every edit) — neither has an edit
+  // form field yet, so treating "not sent" as "clear it" would silently
+  // wipe them on every unrelated edit (e.g. just flipping Status).
   const input: AccountInput = {
     accountType: existing.account_type as AccountInput["accountType"],
     accountName: body.accountName ?? existing.account_name,
@@ -169,6 +174,9 @@ accountsRouter.patch("/:id", (req, res) => {
     minimumPaymentMinor: body.minimumPaymentMinor,
     dueDateDay: body.dueDateDay,
     cutOffDateDay: body.cutOffDateDay,
+    reminderLeadTimeDays: body.reminderLeadTimeDays !== undefined ? body.reminderLeadTimeDays : existing.reminder_lead_time_days,
+    valuationMethod:
+      body.valuationMethod !== undefined ? body.valuationMethod : (existing.valuation_method as AccountInput["valuationMethod"]),
   };
 
   const errors = validateAccountInput(input);
@@ -202,7 +210,8 @@ accountsRouter.patch("/:id", (req, res) => {
          beginning_balance_minor = @beginningBalanceMinor,
          current_balance_minor = @currentBalanceMinor, card_balance_minor = @cardBalanceMinor,
          minimum_payment_minor = @minimumPaymentMinor, due_date_day = @dueDateDay,
-         cut_off_date_day = @cutOffDateDay,
+         cut_off_date_day = @cutOffDateDay, reminder_lead_time_days = @reminderLeadTimeDays,
+         valuation_method = @valuationMethod,
          updated_at = datetime('now')
        WHERE id = @id`
     ).run({
@@ -218,6 +227,8 @@ accountsRouter.patch("/:id", (req, res) => {
       minimumPaymentMinor: input.minimumPaymentMinor ?? null,
       dueDateDay: input.dueDateDay ?? null,
       cutOffDateDay: input.cutOffDateDay ?? null,
+      reminderLeadTimeDays: input.reminderLeadTimeDays ?? null,
+      valuationMethod: input.valuationMethod ?? null,
       id: req.params.id,
     });
     const row = db.prepare("SELECT * FROM accounts WHERE id = ?").get(req.params.id) as unknown as AccountRow;
