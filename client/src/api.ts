@@ -137,7 +137,7 @@ export interface GoalLink {
 
 export interface Goal {
   id: number;
-  goalType: "DebtPayoff" | "EmergencyFund" | "SavingsTarget" | "InvestmentTarget";
+  goalType: "DebtPayoff" | "EmergencyFund" | "SavingsTarget" | "InvestmentTarget" | "MajorPurchase";
   targetAmountMinor: number;
   targetDate: string | null;
   strategy: "Snowball" | "Avalanche" | null;

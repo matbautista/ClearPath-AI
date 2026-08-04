@@ -308,7 +308,7 @@ CREATE INDEX idx_recurring_rules_next_run ON recurring_rules(next_run_date) WHER
 -- =========================================================================
 CREATE TABLE goals (
     id                          INTEGER PRIMARY KEY,
-    goal_type                   TEXT NOT NULL CHECK (goal_type IN ('DebtPayoff','EmergencyFund','SavingsTarget','InvestmentTarget')),
+    goal_type                   TEXT NOT NULL CHECK (goal_type IN ('DebtPayoff','EmergencyFund','SavingsTarget','InvestmentTarget','MajorPurchase')),
     target_amount_minor         INTEGER NOT NULL,
     target_date                  TEXT,
     strategy                     TEXT CHECK (strategy IN ('Snowball','Avalanche')), -- DebtPayoff only (3.10); NULL otherwise
@@ -421,7 +421,7 @@ CREATE TABLE ai_analysis_runs (
 --
 -- DebtPayoff: Completed if every linked Loan/CreditCard account's
 -- current_balance_minor/card_balance_minor = 0; else Active.
--- EmergencyFund/SavingsTarget/InvestmentTarget: Completed if
+-- EmergencyFund/SavingsTarget/InvestmentTarget/MajorPurchase: Completed if
 -- SUM(linked accounts' allocation-adjusted balance) >= target_amount_minor;
 -- else Active. Never touches Abandoned goals.
 

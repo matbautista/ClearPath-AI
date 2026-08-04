@@ -9,6 +9,7 @@ const GOAL_TYPE_LABELS: Record<Goal["goalType"], string> = {
   EmergencyFund: "Emergency Fund",
   SavingsTarget: "Savings Target",
   InvestmentTarget: "Investment Target",
+  MajorPurchase: "Major Purchase",
 };
 
 function GoalCard({ goal, accounts, onChange }: { goal: Goal; accounts: Account[]; onChange: () => void }) {
@@ -242,6 +243,7 @@ export function GoalsPage() {
                 <option value="SavingsTarget">Savings Target</option>
                 <option value="EmergencyFund">Emergency Fund</option>
                 <option value="InvestmentTarget">Investment Target</option>
+                <option value="MajorPurchase">Major Purchase</option>
                 <option value="DebtPayoff">Debt Payoff</option>
               </select>
             </label>

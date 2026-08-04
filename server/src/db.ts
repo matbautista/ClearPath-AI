@@ -186,6 +186,49 @@ function migrateAccountsAddRealEstate() {
   }
 }
 
+// Same rebuild dance as migrateAccountsAddEWallet above — SQLite can't ALTER
+// a CHECK constraint in place. goals has no incoming FKs from other tables
+// (only goal_account_links.goal_id points at it, and that's fine to leave
+// pointing at "goals" throughout since this table is never renamed away,
+// only rebuilt under a throwaway name first), so this is simpler than the
+// accounts case: no risk of the rename-then-drop FK-corruption bug.
+function migrateGoalsAddMajorPurchase() {
+  const row = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='goals'").get() as
+    | { sql: string }
+    | undefined;
+  if (!row || row.sql.includes("'MajorPurchase'")) return;
+
+  console.log("[db] migration: adding 'MajorPurchase' to goals.goal_type");
+  db.exec("PRAGMA foreign_keys = OFF");
+  db.exec("BEGIN");
+  try {
+    db.exec(`
+      CREATE TABLE goals_new (
+          id                          INTEGER PRIMARY KEY,
+          goal_type                   TEXT NOT NULL CHECK (goal_type IN ('DebtPayoff','EmergencyFund','SavingsTarget','InvestmentTarget','MajorPurchase')),
+          target_amount_minor         INTEGER NOT NULL,
+          target_date                  TEXT,
+          strategy                     TEXT CHECK (strategy IN ('Snowball','Avalanche')),
+          total_monthly_payment_budget_minor INTEGER,
+          status                        TEXT NOT NULL DEFAULT 'Active' CHECK (status IN ('Active','Completed','Abandoned')),
+          created_at                    TEXT NOT NULL DEFAULT (datetime('now')),
+          updated_at                    TEXT NOT NULL DEFAULT (datetime('now')),
+          CHECK (goal_type = 'DebtPayoff' OR (strategy IS NULL AND total_monthly_payment_budget_minor IS NULL))
+      )
+    `);
+    db.exec("INSERT INTO goals_new SELECT * FROM goals");
+    db.exec("DROP TABLE goals");
+    db.exec("ALTER TABLE goals_new RENAME TO goals");
+    db.exec("COMMIT");
+    console.log("[db] migration: goals table rebuilt with MajorPurchase support");
+  } catch (err) {
+    db.exec("ROLLBACK");
+    throw err;
+  } finally {
+    db.exec("PRAGMA foreign_keys = ON");
+  }
+}
+
 // One-time repair for a DB that already hit the rename-then-drop bug
 // described above: any table whose stored schema still says
 // `REFERENCES "accounts_old"(id)` gets rebuilt with that fixed back to
@@ -265,6 +308,7 @@ function runMigrations() {
 
   migrateAccountsAddEWallet();
   migrateAccountsAddRealEstate();
+  migrateGoalsAddMajorPurchase();
   repairAccountsOldReferences();
 }
 

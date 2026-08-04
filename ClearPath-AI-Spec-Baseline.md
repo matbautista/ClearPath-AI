@@ -192,7 +192,7 @@ A scheduled job checks `Next Run Date` daily; when due, it creates a Transaction
 | Field | Notes |
 |---|---|
 | Goal ID | |
-| Goal Type | Debt Payoff, Emergency Fund, Savings Target, Investment Target |
+| Goal Type | Debt Payoff, Emergency Fund, Savings Target, Investment Target, Major Purchase |
 | Target Amount | |
 | Target Date | |
 | Strategy | Debt Payoff only — Snowball (default) or Avalanche (3.10) |
@@ -209,7 +209,7 @@ A scheduled job checks `Next Run Date` daily; when due, it creates a Transaction
 
 **Completion trigger**: defined strictly in terms of balance, **never** Account `Status` (2.1) — an account can be Closed while still owing money, or Active at $0, so Status alone would either mark an unpaid closed debt "complete" too early or leave a genuinely-finished goal stuck open.
 - **Debt Payoff**: Status → Completed the moment every linked Loan/Credit Card account's balance (`Current Balance` / `Card Balance`) reaches zero; reverts to Active if any linked balance becomes nonzero again (above).
-- **Emergency Fund / Savings Target / Investment Target**: Status → Completed when the Allocation-adjusted sum of linked accounts' balances reaches Target Amount; reverts to Active if it later drops back below Target Amount.
+- **Emergency Fund / Savings Target / Investment Target / Major Purchase**: Status → Completed when the Allocation-adjusted sum of linked accounts' balances reaches Target Amount; reverts to Active if it later drops back below Target Amount.
 - Because Status is derived rather than stored-and-forgotten, this re-evaluation happens on every relevant balance change, not just once — it can't drift out of sync with reality.
 - The Multi-debt allocation rolldown (3.10) reuses this exact same "linked debt's balance has reached zero" check to decide when to roll that debt's payment onto the next-ranked one — one shared definition of "paid off," not a second one maintained separately in the allocation engine.
 - Completed and Abandoned goals drop out of "active goals" widgets (3.1, 3.11 — "active" means Status = Active) but are never deleted; they remain viewable as history.

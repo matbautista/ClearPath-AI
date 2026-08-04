@@ -3,13 +3,18 @@
 ## Start it
 
 Double-click **`start.bat`** in this folder. It builds the client and server,
-then starts the app. Once the console shows:
+then starts the app, printing your PC's LAN IP addresses and something like:
 
 ```
-[server] ClearPath AI listening on http://127.0.0.1:4000
+Starting ClearPath AI...
+  - On this PC:            http://127.0.0.1:4000
+  - On phone/tablet (same Wi-Fi): http://THE-IP-ABOVE:4000
 ```
 
-open that URL in your browser. Log in with your passphrase.
+Open the `127.0.0.1` URL on this PC, or the LAN IP URL from another device on
+the same Wi-Fi. Log in with your passphrase. If this is the first run,
+Windows Firewall may prompt to allow `node.exe` through — choose **Private
+networks** only, then Allow.
 
 ## Stop it
 
@@ -33,16 +38,24 @@ automatic backup built in.
 
 ## Access
 
-The server only binds to `127.0.0.1` (this machine) — it's not reachable
-from your phone or any other device on your network, even if your firewall
-allows it. This is deliberate: there's no HTTPS in front of it, so keeping
-it loopback-only means your passphrase and session cookie never leave the
-machine.
+`start.bat` binds the server to `0.0.0.0`, so it's reachable from any device
+on your Wi-Fi (phone, tablet, another PC) at `http://<your-PC's-LAN-IP>:4000`
+— the addresses `start.bat` prints at startup. Only devices on your local
+network can reach it; it's not exposed to the internet unless your router is
+specifically configured to forward the port (routers don't do this by
+default).
 
-If you later want LAN access, that needs more than flipping a setting — you'd
-want a reverse proxy (e.g. Caddy or Tailscale) providing TLS in front of it
-first, since otherwise your login passphrase would cross your Wi-Fi in
-plaintext. Ask if you want that set up.
+**There is no HTTPS in front of this.** Your login passphrase and session
+cookie cross your Wi-Fi in plaintext on every request. On a trusted home
+network this is a manageable risk, but anyone else who can see your Wi-Fi
+traffic (another device on the same network, a compromised router, a public
+or shared network) can too. If you want that closed, put a reverse proxy
+(e.g. Caddy or Tailscale) providing TLS in front of the app — ask if you
+want that set up.
+
+If you'd rather go back to loopback-only (no LAN access, no plaintext
+exposure), edit `start.bat` and delete the `set HOST=0.0.0.0` line — the
+server defaults to `127.0.0.1` on its own.
 
 ## After I push code updates
 

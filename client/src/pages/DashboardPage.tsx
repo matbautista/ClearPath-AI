@@ -9,6 +9,7 @@ const GOAL_TYPE_LABELS: Record<Goal["goalType"], string> = {
   EmergencyFund: "Emergency Fund",
   SavingsTarget: "Savings Target",
   InvestmentTarget: "Investment Target",
+  MajorPurchase: "Major Purchase",
 };
 
 const DUE_SOURCE_LABELS: Record<string, string> = {

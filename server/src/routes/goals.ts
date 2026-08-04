@@ -4,7 +4,7 @@ import { computeGoalProgress, recomputeGoalStatus, validateAllocation } from "..
 
 export const goalsRouter = Router();
 
-const GOAL_TYPES = ["DebtPayoff", "EmergencyFund", "SavingsTarget", "InvestmentTarget"];
+const GOAL_TYPES = ["DebtPayoff", "EmergencyFund", "SavingsTarget", "InvestmentTarget", "MajorPurchase"];
 const STRATEGIES = ["Snowball", "Avalanche"];
 
 interface GoalRow {
