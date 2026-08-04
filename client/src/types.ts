@@ -50,7 +50,10 @@ export interface EditAccountInput {
   institutionName?: string;
   beginningBalanceMinor?: number;
   interestRatePct?: number;
+  minimumPaymentMinor?: number;
   creditLimitMinor?: number;
   loanAmountMinor?: number;
+  dueDateDay?: number;
+  cutOffDateDay?: number;
   status: AccountStatus;
 }

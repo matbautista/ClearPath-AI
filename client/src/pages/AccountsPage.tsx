@@ -54,8 +54,11 @@ export function AccountsPage() {
       institutionName: a.institutionName ?? undefined,
       beginningBalanceMinor: a.beginningBalanceMinor,
       interestRatePct: a.interestRatePct ?? undefined,
+      minimumPaymentMinor: a.minimumPaymentMinor ?? undefined,
       creditLimitMinor: a.creditLimitMinor ?? undefined,
       loanAmountMinor: a.loanAmountMinor ?? undefined,
+      dueDateDay: a.dueDateDay ?? undefined,
+      cutOffDateDay: a.cutOffDateDay ?? undefined,
       status: a.status,
     });
     setFormErrors([]);
@@ -77,8 +80,11 @@ export function AccountsPage() {
           institutionName: form.institutionName,
           beginningBalanceMinor: form.beginningBalanceMinor,
           interestRatePct: form.interestRatePct,
+          minimumPaymentMinor: form.minimumPaymentMinor,
           creditLimitMinor: form.creditLimitMinor,
           loanAmountMinor: form.loanAmountMinor,
+          dueDateDay: form.dueDateDay,
+          cutOffDateDay: form.cutOffDateDay,
           status: form.status ?? "Active",
         });
       } else {
@@ -282,6 +288,57 @@ export function AccountsPage() {
               </label>
             )}
           </div>
+
+          {isLoanOrCard && (
+            <div className="field-row">
+              <label>
+                Minimum payment
+                <input
+                  type="number"
+                  step="0.01"
+                  value={form.minimumPaymentMinor != null ? form.minimumPaymentMinor / 100 : ""}
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      minimumPaymentMinor: e.target.value === "" ? undefined : toMinorUnits(Number(e.target.value)),
+                    })
+                  }
+                />
+              </label>
+              <label>
+                Due date (day of month)
+                <input
+                  type="number"
+                  min={1}
+                  max={31}
+                  value={form.dueDateDay ?? ""}
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      dueDateDay: e.target.value === "" ? undefined : Number(e.target.value),
+                    })
+                  }
+                />
+              </label>
+              {isCreditCard && (
+                <label>
+                  Cut-off date (day of month)
+                  <input
+                    type="number"
+                    min={1}
+                    max={31}
+                    value={form.cutOffDateDay ?? ""}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        cutOffDateDay: e.target.value === "" ? undefined : Number(e.target.value),
+                      })
+                    }
+                  />
+                </label>
+              )}
+            </div>
+          )}
 
           {editingId != null && (
             <p className="muted">

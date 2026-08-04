@@ -166,6 +166,9 @@ accountsRouter.patch("/:id", (req, res) => {
     creditLimitMinor: body.creditLimitMinor,
     loanAmountMinor: body.loanAmountMinor,
     beginningBalanceMinor: body.beginningBalanceMinor,
+    minimumPaymentMinor: body.minimumPaymentMinor,
+    dueDateDay: body.dueDateDay,
+    cutOffDateDay: body.cutOffDateDay,
   };
 
   const errors = validateAccountInput(input);
@@ -198,6 +201,8 @@ accountsRouter.patch("/:id", (req, res) => {
          loan_amount_minor = @loanAmountMinor, status = @status,
          beginning_balance_minor = @beginningBalanceMinor,
          current_balance_minor = @currentBalanceMinor, card_balance_minor = @cardBalanceMinor,
+         minimum_payment_minor = @minimumPaymentMinor, due_date_day = @dueDateDay,
+         cut_off_date_day = @cutOffDateDay,
          updated_at = datetime('now')
        WHERE id = @id`
     ).run({
@@ -210,6 +215,9 @@ accountsRouter.patch("/:id", (req, res) => {
       beginningBalanceMinor,
       currentBalanceMinor,
       cardBalanceMinor,
+      minimumPaymentMinor: input.minimumPaymentMinor ?? null,
+      dueDateDay: input.dueDateDay ?? null,
+      cutOffDateDay: input.cutOffDateDay ?? null,
       id: req.params.id,
     });
     const row = db.prepare("SELECT * FROM accounts WHERE id = ?").get(req.params.id) as unknown as AccountRow;
