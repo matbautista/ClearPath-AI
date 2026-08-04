@@ -18,6 +18,16 @@ const DUE_SOURCE_LABELS: Record<string, string> = {
   TaxFee: "Tax/Fee",
 };
 
+// UTC-safe, matching the server's own date arithmetic (dateMath.ts) —
+// avoids the local-midnight/UTC-render mismatch that `new Date(dateStr)`
+// plus `.toISOString()` can introduce.
+function addDaysUTC(dateStr: string, days: number): string {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const date = new Date(Date.UTC(y, m - 1, d));
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
 function StatTile({ label, valueMinor, currency, emphasis }: { label: string; valueMinor: number; currency: string; emphasis?: boolean }) {
   return (
     <div className={`stat-tile${emphasis ? " stat-tile-emphasis" : ""}`}>
@@ -152,14 +162,17 @@ export function DashboardPage({ onNavigateToRecurring }: { onNavigateToRecurring
           <p className="muted">Nothing due in the next 30 days.</p>
         ) : (
           <ul className="upcoming-dues-list">
-            {summary.upcomingDues.map((d, i) => (
-              <li key={i}>
-                <span>{d.label}</span>
-                <span className="muted">{DUE_SOURCE_LABELS[d.source]}</span>
-                <span className="muted">{d.dueDate}</span>
-                <span className="numeric">{formatMinor(d.amountMinor, baseCurrency)}</span>
-              </li>
-            ))}
+            {summary.upcomingDues.map((d, i) => {
+              const dueSoon = d.dueDate <= addDaysUTC(new Date().toISOString().slice(0, 10), 7);
+              return (
+                <li key={i}>
+                  <span className={dueSoon ? "due-soon" : undefined}>{d.label}</span>
+                  <span className={`muted${dueSoon ? " due-soon" : ""}`}>{DUE_SOURCE_LABELS[d.source]}</span>
+                  <span className={`muted${dueSoon ? " due-soon" : ""}`}>{d.dueDate}</span>
+                  <span className={`numeric${dueSoon ? " due-soon" : ""}`}>{formatMinor(d.amountMinor, baseCurrency)}</span>
+                </li>
+              );
+            })}
           </ul>
         )}
       </section>

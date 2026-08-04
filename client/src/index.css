@@ -615,21 +615,27 @@ button.secondary:hover:not(:disabled) {
   margin-bottom: 4px;
 }
 
+/* One grid shared by the whole list, not one grid per <li> — otherwise
+   each row's trailing (auto-width) amount column sizes independently,
+   shifting the date column out of alignment row to row. */
 .upcoming-dues-list {
   list-style: none;
   margin: 0;
   padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+  display: grid;
+  grid-template-columns: 1.5fr 1fr 1fr auto;
+  align-items: center;
+  gap: 10px 8px;
+  font-size: 0.9rem;
 }
 
 .upcoming-dues-list li {
-  display: grid;
-  grid-template-columns: 1.5fr 1fr 1fr auto;
-  gap: 8px;
-  align-items: center;
-  font-size: 0.9rem;
+  display: contents;
+}
+
+.upcoming-dues-list .due-soon {
+  font-weight: 700;
+  color: var(--status-completed-text);
 }
 
 .upcoming-dues-list .numeric {
