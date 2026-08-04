@@ -183,6 +183,15 @@ function UtilitiesSection({
     window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
   }
 
+  // "Day of month" only unambiguously identifies a date for schedules that
+  // recur every month — Quarterly/Annually/Variable utilities would need a
+  // month too, and since these fields aren't used to compute due dates
+  // anyway (Upcoming Dues reads the Recurring Rule's Next Run Date for
+  // Utilities, unlike Loan/Credit Card accounts where Due Date Day is load-
+  // bearing — see dashboardEngine.ts), just hide them rather than let them
+  // record a half-specified date.
+  const showDayOfMonthFields = schedule === "Monthly" || schedule === "Bi-Monthly";
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (defaultAccountId === "" || templateAmount === "") return;
@@ -191,8 +200,8 @@ function UtilitiesSection({
       const input = {
         providerName,
         defaultAccountId: Number(defaultAccountId),
-        dueDateDay: dueDateDay === "" ? undefined : Number(dueDateDay),
-        cutOffDateDay: cutOffDateDay === "" ? undefined : Number(cutOffDateDay),
+        dueDateDay: showDayOfMonthFields && dueDateDay !== "" ? Number(dueDateDay) : undefined,
+        cutOffDateDay: showDayOfMonthFields && cutOffDateDay !== "" ? Number(cutOffDateDay) : undefined,
         policyType: policyType.trim() === "" ? undefined : policyType.trim(),
         schedule,
         templateAmountMinor: toMinorUnits(templateAmount),
@@ -279,22 +288,24 @@ function UtilitiesSection({
             </select>
           </label>
         </div>
-        <div className="field-row field-row-even">
-          <label>
-            Cut-off date (day of month)
-            <input
-              type="number"
-              min={1}
-              max={31}
-              value={cutOffDateDay}
-              onChange={(e) => setCutOffDateDay(e.target.value === "" ? "" : Number(e.target.value))}
-            />
-          </label>
-          <label>
-            Due date (day of month)
-            <input type="number" min={1} max={31} value={dueDateDay} onChange={(e) => setDueDateDay(e.target.value === "" ? "" : Number(e.target.value))} />
-          </label>
-        </div>
+        {showDayOfMonthFields && (
+          <div className="field-row field-row-even">
+            <label>
+              Cut-off date (day of month)
+              <input
+                type="number"
+                min={1}
+                max={31}
+                value={cutOffDateDay}
+                onChange={(e) => setCutOffDateDay(e.target.value === "" ? "" : Number(e.target.value))}
+              />
+            </label>
+            <label>
+              Due date (day of month)
+              <input type="number" min={1} max={31} value={dueDateDay} onChange={(e) => setDueDateDay(e.target.value === "" ? "" : Number(e.target.value))} />
+            </label>
+          </div>
+        )}
         <div className="field-row field-row-even">
           <label>
             Schedule
