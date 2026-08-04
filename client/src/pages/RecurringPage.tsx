@@ -347,6 +347,7 @@ function IncomeSourcesSection({
   baseCurrency: string;
   onChange: () => void;
 }) {
+  const [editingId, setEditingId] = useState<number | null>(null);
   const [sourceName, setSourceName] = useState("");
   const [incomeCategory, setIncomeCategory] = useState<string>(INCOME_CATEGORIES[0]);
   const [creditToAccountId, setCreditToAccountId] = useState<number | "">("");
@@ -355,23 +356,48 @@ function IncomeSourcesSection({
   const [nextRunDate, setNextRunDate] = useState("");
   const [errors, setErrors] = useState<string[]>([]);
 
+  function resetForm() {
+    setEditingId(null);
+    setSourceName("");
+    setIncomeCategory(INCOME_CATEGORIES[0]);
+    setCreditToAccountId("");
+    setSchedule("Monthly");
+    setTemplateAmount("");
+    setNextRunDate("");
+    setErrors([]);
+  }
+
+  function startEdit(i: IncomeSource) {
+    setEditingId(i.id);
+    setSourceName(i.sourceName);
+    setIncomeCategory(i.incomeCategory);
+    setCreditToAccountId(i.creditToAccountId);
+    setSchedule(i.schedule);
+    setTemplateAmount(i.templateAmountMinor / 100);
+    setNextRunDate(i.nextRunDate ?? "");
+    setErrors([]);
+    window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (creditToAccountId === "" || templateAmount === "") return;
     setErrors([]);
     try {
-      await api.createIncomeSource({
+      const input = {
         sourceName,
         incomeCategory,
         creditToAccountId: Number(creditToAccountId),
         schedule,
         templateAmountMinor: toMinorUnits(templateAmount),
         nextRunDate: schedule === "Variable" ? undefined : nextRunDate,
-      });
-      setSourceName("");
-      setCreditToAccountId("");
-      setTemplateAmount("");
-      setNextRunDate("");
+      };
+      if (editingId != null) {
+        await api.updateIncomeSource(editingId, input);
+      } else {
+        await api.createIncomeSource(input);
+      }
+      resetForm();
       onChange();
     } catch (err) {
       setErrors(err instanceof ApiError ? err.errors : ["Something went wrong."]);
@@ -394,6 +420,7 @@ function IncomeSourcesSection({
                 <th>Schedule</th>
                 <th className="numeric">Amount</th>
                 <th>Next run</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
@@ -405,6 +432,11 @@ function IncomeSourcesSection({
                   <td className="muted">{i.schedule}</td>
                   <td className="numeric">{formatMinor(i.templateAmountMinor, baseCurrency)}</td>
                   <td className="muted">{i.nextRunDate ?? "—"}</td>
+                  <td>
+                    <button type="button" className="secondary" onClick={() => startEdit(i)}>
+                      Edit
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -413,7 +445,7 @@ function IncomeSourcesSection({
       </section>
 
       <section className="new-income-source-form">
-        <h2>Add an income source</h2>
+        <h2>{editingId != null ? "Edit income source" : "Add an income source"}</h2>
         <form onSubmit={handleSubmit}>
         <div className="field-row">
           <label>
@@ -451,13 +483,19 @@ function IncomeSourcesSection({
             Gross amount
             <input type="number" step="0.01" value={templateAmount} onChange={(e) => setTemplateAmount(e.target.value === "" ? "" : Number(e.target.value))} />
           </label>
-          {schedule !== "Variable" && (
+          {editingId == null && schedule !== "Variable" && (
             <label>
               Next run date
               <input type="date" value={nextRunDate} onChange={(e) => setNextRunDate(e.target.value)} />
             </label>
           )}
         </div>
+        {editingId != null && (
+          <p className="muted">
+            Next run date can't be changed here — it's managed by the missed-run catch-up schedule (2.7). Create a
+            new income source if you need a different one.
+          </p>
+        )}
         {errors.length > 0 && (
           <ul className="form-errors">
             {errors.map((err) => (
@@ -465,7 +503,12 @@ function IncomeSourcesSection({
             ))}
           </ul>
         )}
-        <button type="submit">Add income source</button>
+        <button type="submit">{editingId != null ? "Save changes" : "Add income source"}</button>
+        {editingId != null && (
+          <button type="button" className="secondary" onClick={resetForm} style={{ marginLeft: 8 }}>
+            Cancel
+          </button>
+        )}
         </form>
       </section>
     </>
@@ -483,6 +526,7 @@ function TaxFeesSection({
   baseCurrency: string;
   onChange: () => void;
 }) {
+  const [editingId, setEditingId] = useState<number | null>(null);
   const [regulatoryName, setRegulatoryName] = useState("");
   const [feeCategory, setFeeCategory] = useState("");
   const [debitFromAccountId, setDebitFromAccountId] = useState<number | "">("");
@@ -491,24 +535,48 @@ function TaxFeesSection({
   const [nextRunDate, setNextRunDate] = useState("");
   const [errors, setErrors] = useState<string[]>([]);
 
+  function resetForm() {
+    setEditingId(null);
+    setRegulatoryName("");
+    setFeeCategory("");
+    setDebitFromAccountId("");
+    setSchedule("Annually");
+    setTemplateAmount("");
+    setNextRunDate("");
+    setErrors([]);
+  }
+
+  function startEdit(t: TaxFee) {
+    setEditingId(t.id);
+    setRegulatoryName(t.regulatoryName);
+    setFeeCategory(t.feeCategory ?? "");
+    setDebitFromAccountId(t.debitFromAccountId);
+    setSchedule(t.schedule);
+    setTemplateAmount(t.templateAmountMinor / 100);
+    setNextRunDate(t.nextRunDate ?? "");
+    setErrors([]);
+    window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (debitFromAccountId === "" || templateAmount === "") return;
     setErrors([]);
     try {
-      await api.createTaxFee({
+      const input = {
         regulatoryName,
         feeCategory: feeCategory || undefined,
         debitFromAccountId: Number(debitFromAccountId),
         schedule,
         templateAmountMinor: toMinorUnits(templateAmount),
         nextRunDate: schedule === "Variable" ? undefined : nextRunDate,
-      });
-      setRegulatoryName("");
-      setFeeCategory("");
-      setDebitFromAccountId("");
-      setTemplateAmount("");
-      setNextRunDate("");
+      };
+      if (editingId != null) {
+        await api.updateTaxFee(editingId, input);
+      } else {
+        await api.createTaxFee(input);
+      }
+      resetForm();
       onChange();
     } catch (err) {
       setErrors(err instanceof ApiError ? err.errors : ["Something went wrong."]);
@@ -530,6 +598,7 @@ function TaxFeesSection({
                 <th>Schedule</th>
                 <th className="numeric">Amount</th>
                 <th>Next run</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
@@ -540,6 +609,11 @@ function TaxFeesSection({
                   <td className="muted">{t.schedule}</td>
                   <td className="numeric">{formatMinor(t.templateAmountMinor, baseCurrency)}</td>
                   <td className="muted">{t.nextRunDate ?? "—"}</td>
+                  <td>
+                    <button type="button" className="secondary" onClick={() => startEdit(t)}>
+                      Edit
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -548,7 +622,7 @@ function TaxFeesSection({
       </section>
 
       <section className="new-tax-fee-form">
-        <h2>Add a tax/fee</h2>
+        <h2>{editingId != null ? "Edit tax/fee" : "Add a tax/fee"}</h2>
         <form onSubmit={handleSubmit}>
         <div className="field-row">
           <label>
@@ -580,13 +654,19 @@ function TaxFeesSection({
             Typical amount
             <input type="number" step="0.01" value={templateAmount} onChange={(e) => setTemplateAmount(e.target.value === "" ? "" : Number(e.target.value))} />
           </label>
-          {schedule !== "Variable" && (
+          {editingId == null && schedule !== "Variable" && (
             <label>
               Next run date
               <input type="date" value={nextRunDate} onChange={(e) => setNextRunDate(e.target.value)} />
             </label>
           )}
         </div>
+        {editingId != null && (
+          <p className="muted">
+            Next run date can't be changed here — it's managed by the missed-run catch-up schedule (2.7). Create a
+            new tax/fee if you need a different one.
+          </p>
+        )}
         {errors.length > 0 && (
           <ul className="form-errors">
             {errors.map((err) => (
@@ -594,7 +674,12 @@ function TaxFeesSection({
             ))}
           </ul>
         )}
-        <button type="submit">Add tax/fee</button>
+        <button type="submit">{editingId != null ? "Save changes" : "Add tax/fee"}</button>
+        {editingId != null && (
+          <button type="button" className="secondary" onClick={resetForm} style={{ marginLeft: 8 }}>
+            Cancel
+          </button>
+        )}
         </form>
       </section>
     </>
