@@ -87,18 +87,40 @@ function takeSnapshotIfMissing(date: string): boolean {
   return true;
 }
 
+// Unlike a past day's snapshot (taken once and left alone), today's row is
+// overwritten on every call — it reads the same live balance cache the
+// Dashboard's Net Worth tile uses, so the trend chart's most recent point
+// stays in sync as accounts/transactions change intraday instead of
+// freezing at whatever the first run of the day happened to see.
+function upsertTodaySnapshot(date: string): void {
+  const { totalAssetsMinor, totalLiabilitiesMinor, netWorthMinor } = computeCurrentNetWorth();
+  db.prepare(
+    `INSERT INTO net_worth_snapshots (snapshot_date, total_assets_minor, total_liabilities_minor, net_worth_minor)
+     VALUES (?, ?, ?, ?)
+     ON CONFLICT (snapshot_date) DO UPDATE SET
+       total_assets_minor = excluded.total_assets_minor,
+       total_liabilities_minor = excluded.total_liabilities_minor,
+       net_worth_minor = excluded.net_worth_minor`
+  ).run(date, totalAssetsMinor, totalLiabilitiesMinor, netWorthMinor);
+}
+
 // Missed-run handling (3.1): back-fills every day between the last
-// snapshot and today (inclusive) by reconstructing point-in-time
-// balances, rather than leaving silent gaps in the trend chart when the
-// self-hosted instance was offline at the scheduled time.
+// snapshot and yesterday by reconstructing point-in-time balances, rather
+// than leaving silent gaps in the trend chart when the self-hosted
+// instance was offline at the scheduled time. Today itself is never
+// back-filled this way — it's always refreshed live via
+// upsertTodaySnapshot below, since "as of today" and "right now" are the
+// same moment and the live balance cache is both cheaper and always
+// current.
 export function backfillSnapshots(today: string = todayUTC()): number {
   const last = db.prepare("SELECT MAX(snapshot_date) as d FROM net_worth_snapshots").get() as { d: string | null };
   let cursor = last.d ? addDaysUTC(last.d, 1) : today;
 
   let generated = 0;
-  while (cursor <= today) {
+  while (cursor < today) {
     if (takeSnapshotIfMissing(cursor)) generated++;
     cursor = addDaysUTC(cursor, 1);
   }
+  upsertTodaySnapshot(today);
   return generated;
 }
