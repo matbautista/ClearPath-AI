@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api, type DashboardSummary, type NetWorthTrendPoint, type SavingsRateResult, type Goal, type MoneyPitFlag } from "../api";
+import { api, type DashboardSummary, type NetWorthTrendPoint, type SavingsRateResult, type Goal, type MoneyPitFlag, type PendingTransaction } from "../api";
 import { formatMinor } from "../lib/money";
 import { useSettings } from "../SettingsContext";
 import { NetWorthChart } from "../components/NetWorthChart";
@@ -52,7 +52,7 @@ function MoneyPitCard({ flag, currency, onDismiss }: { flag: MoneyPitFlag; curre
   );
 }
 
-export function DashboardPage() {
+export function DashboardPage({ onNavigateToRecurring }: { onNavigateToRecurring: () => void }) {
   const { baseCurrency } = useSettings();
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [trend, setTrend] = useState<NetWorthTrendPoint[]>([]);
@@ -60,17 +60,19 @@ export function DashboardPage() {
   const [savingsPeriod, setSavingsPeriod] = useState<30 | 90>(30);
   const [goals, setGoals] = useState<Goal[]>([]);
   const [moneyPits, setMoneyPits] = useState<MoneyPitFlag[]>([]);
+  const [pending, setPending] = useState<PendingTransaction[]>([]);
   const [loading, setLoading] = useState(true);
 
   function loadAll() {
     setLoading(true);
-    Promise.all([api.dashboardSummary(), api.netWorthTrend(90), api.savingsRate(savingsPeriod), api.listGoals(), api.listMoneyPits()])
-      .then(([s, t, sr, g, mp]) => {
+    Promise.all([api.dashboardSummary(), api.netWorthTrend(90), api.savingsRate(savingsPeriod), api.listGoals(), api.listMoneyPits(), api.listPending()])
+      .then(([s, t, sr, g, mp, p]) => {
         setSummary(s);
         setTrend(t);
         setSavingsRate(sr);
         setGoals(g.filter((goal) => goal.status === "Active"));
         setMoneyPits(mp);
+        setPending(p);
       })
       .finally(() => setLoading(false));
   }
@@ -90,6 +92,17 @@ export function DashboardPage() {
         <h1>Dashboard</h1>
         <p className="page-subtitle">How much you have, what's due soon, and whether you're saving — without needing AI Analysis enabled (3.1).</p>
       </header>
+
+      {pending.length > 0 && (
+        <div className="pending-callout">
+          <span>
+            {pending.length} recurring transaction{pending.length === 1 ? "" : "s"} awaiting confirmation — not yet reflected in the totals below.
+          </span>
+          <button type="button" className="secondary" onClick={onNavigateToRecurring}>
+            Review
+          </button>
+        </div>
+      )}
 
       <div className="stat-tile-row">
         <StatTile label="Cash on Hand" valueMinor={summary.cashOnHandMinor} currency={baseCurrency} />

@@ -517,6 +517,25 @@ button.secondary:hover:not(:disabled) {
 }
 
 /* --- Dashboard --- */
+.pending-callout {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  background: var(--status-completed-bg);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 12px 16px;
+  margin-bottom: 24px;
+  font-size: 0.9rem;
+}
+
+.pending-callout button {
+  flex-shrink: 0;
+  padding: 6px 14px;
+  font-size: 0.85rem;
+}
+
 .stat-tile-row {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
