@@ -90,6 +90,14 @@ function PendingPanel({ pending, onChange }: { pending: PendingTransaction[]; on
   );
 }
 
+type RecurringTab = "utilities" | "income" | "taxfees";
+
+const TABS: { key: RecurringTab; label: string }[] = [
+  { key: "utilities", label: "Utilities" },
+  { key: "income", label: "Income Sources" },
+  { key: "taxfees", label: "Taxes & Other Regulatory Fees" },
+];
+
 export function RecurringPage() {
   const { baseCurrency } = useSettings();
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -98,6 +106,7 @@ export function RecurringPage() {
   const [taxFees, setTaxFees] = useState<TaxFee[]>([]);
   const [pending, setPending] = useState<PendingTransaction[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<RecurringTab>("utilities");
 
   function loadAll() {
     setLoading(true);
@@ -128,9 +137,30 @@ export function RecurringPage() {
 
       <PendingPanel pending={pending} onChange={loadAll} />
 
-      <UtilitiesSection utilities={utilities} accounts={accounts} baseCurrency={baseCurrency} onChange={loadAll} />
-      <IncomeSourcesSection incomeSources={incomeSources} accounts={accounts} baseCurrency={baseCurrency} onChange={loadAll} />
-      <TaxFeesSection taxFees={taxFees} accounts={accounts} baseCurrency={baseCurrency} onChange={loadAll} />
+      <div className="tab-bar" role="tablist">
+        {TABS.map((t) => (
+          <button
+            key={t.key}
+            type="button"
+            role="tab"
+            aria-selected={activeTab === t.key}
+            className={activeTab === t.key ? "tab-active" : "tab-button"}
+            onClick={() => setActiveTab(t.key)}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === "utilities" && (
+        <UtilitiesSection utilities={utilities} accounts={accounts} baseCurrency={baseCurrency} onChange={loadAll} />
+      )}
+      {activeTab === "income" && (
+        <IncomeSourcesSection incomeSources={incomeSources} accounts={accounts} baseCurrency={baseCurrency} onChange={loadAll} />
+      )}
+      {activeTab === "taxfees" && (
+        <TaxFeesSection taxFees={taxFees} accounts={accounts} baseCurrency={baseCurrency} onChange={loadAll} />
+      )}
     </div>
   );
 }
