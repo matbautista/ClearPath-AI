@@ -96,45 +96,50 @@ function GoalCard({ goal, accounts, onChange }: { goal: Goal; accounts: Account[
         </ul>
       )}
 
-      {goal.status === "Active" && (
+      {(goal.status === "Active" || goal.status === "Completed") && (
         <div className="goal-actions">
-          {linking ? (
-            <form onSubmit={handleLink} className="goal-link-form">
-              <select value={linkAccountId} onChange={(e) => setLinkAccountId(e.target.value ? Number(e.target.value) : "")}>
-                <option value="">Select account…</option>
-                {eligibleAccounts.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.accountName}
-                  </option>
-                ))}
-              </select>
-              {!isDebtPayoff && (
-                <select value={allocationType} onChange={(e) => setAllocationType(e.target.value as "FixedAmount" | "Percentage")}>
-                  <option value="Percentage">%</option>
-                  <option value="FixedAmount">Fixed</option>
+          {goal.status === "Active" &&
+            (linking ? (
+              <form onSubmit={handleLink} className="goal-link-form">
+                <select value={linkAccountId} onChange={(e) => setLinkAccountId(e.target.value ? Number(e.target.value) : "")}>
+                  <option value="">Select account…</option>
+                  {eligibleAccounts.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.accountName}
+                    </option>
+                  ))}
                 </select>
-              )}
-              {!isDebtPayoff && (
-                <input
-                  type="number"
-                  step="0.01"
-                  value={allocationValue}
-                  onChange={(e) => setAllocationValue(e.target.value === "" ? "" : Number(e.target.value))}
-                  placeholder={allocationType === "Percentage" ? "%" : "amount"}
-                />
-              )}
-              <button type="submit" className="secondary">
-                Link
+                {!isDebtPayoff && (
+                  <select value={allocationType} onChange={(e) => setAllocationType(e.target.value as "FixedAmount" | "Percentage")}>
+                    <option value="Percentage">%</option>
+                    <option value="FixedAmount">Fixed</option>
+                  </select>
+                )}
+                {!isDebtPayoff && (
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={allocationValue}
+                    onChange={(e) => setAllocationValue(e.target.value === "" ? "" : Number(e.target.value))}
+                    placeholder={allocationType === "Percentage" ? "%" : "amount"}
+                  />
+                )}
+                <button type="submit" className="secondary">
+                  Link
+                </button>
+                <button type="button" className="secondary" onClick={() => setLinking(false)}>
+                  Cancel
+                </button>
+              </form>
+            ) : (
+              <button type="button" className="secondary" onClick={() => setLinking(true)}>
+                + Link account
               </button>
-              <button type="button" className="secondary" onClick={() => setLinking(false)}>
-                Cancel
-              </button>
-            </form>
-          ) : (
-            <button type="button" className="secondary" onClick={() => setLinking(true)}>
-              + Link account
-            </button>
-          )}
+            ))}
+          {/* Abandon stays available on a Completed goal too (2.8) — completion is
+              a live-derived status, not a one-way ratchet, but the user should still
+              be able to archive a goal they consider done rather than have it stick
+              around on the list forever with no way to dismiss it. */}
           <button type="button" className="secondary" onClick={handleAbandon}>
             Abandon
           </button>
