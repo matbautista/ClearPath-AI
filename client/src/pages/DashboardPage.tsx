@@ -119,52 +119,50 @@ export function DashboardPage({ onNavigateToRecurring }: { onNavigateToRecurring
         <NetWorthChart points={trend} currency={baseCurrency} />
       </section>
 
-      <div className="dashboard-columns">
-        <section>
-          <div className="section-header-row">
-            <h2>Savings rate</h2>
-            <div className="period-toggle">
-              <button className={savingsPeriod === 30 ? "nav-active" : "nav-link"} onClick={() => setSavingsPeriod(30)}>
-                30d
-              </button>
-              <button className={savingsPeriod === 90 ? "nav-active" : "nav-link"} onClick={() => setSavingsPeriod(90)}>
-                90d
-              </button>
-            </div>
+      <section>
+        <div className="section-header-row">
+          <h2>Savings rate</h2>
+          <div className="period-toggle">
+            <button className={savingsPeriod === 30 ? "nav-active" : "nav-link"} onClick={() => setSavingsPeriod(30)}>
+              30d
+            </button>
+            <button className={savingsPeriod === 90 ? "nav-active" : "nav-link"} onClick={() => setSavingsPeriod(90)}>
+              90d
+            </button>
           </div>
-          {savingsRate && savingsRate.rate == null ? (
-            <p className="muted">Not enough income data for this period.</p>
-          ) : (
-            savingsRate && (
-              <>
-                <div className="savings-rate-figure">{(savingsRate.rate! * 100).toFixed(1)}%</div>
-                <p className="muted">
-                  {formatMinor(savingsRate.incomeMinor, baseCurrency)} in ·{" "}
-                  {formatMinor(savingsRate.expenseMinor, baseCurrency)} spent, last {savingsRate.periodDays} days
-                </p>
-              </>
-            )
-          )}
-        </section>
+        </div>
+        {savingsRate && savingsRate.rate == null ? (
+          <p className="muted">Not enough income data for this period.</p>
+        ) : (
+          savingsRate && (
+            <>
+              <div className="savings-rate-figure">{(savingsRate.rate! * 100).toFixed(1)}%</div>
+              <p className="muted">
+                {formatMinor(savingsRate.incomeMinor, baseCurrency)} in ·{" "}
+                {formatMinor(savingsRate.expenseMinor, baseCurrency)} spent, last {savingsRate.periodDays} days
+              </p>
+            </>
+          )
+        )}
+      </section>
 
-        <section>
-          <h2>Upcoming dues (30 days)</h2>
-          {summary.upcomingDues.length === 0 ? (
-            <p className="muted">Nothing due in the next 30 days.</p>
-          ) : (
-            <ul className="upcoming-dues-list">
-              {summary.upcomingDues.map((d, i) => (
-                <li key={i}>
-                  <span>{d.label}</span>
-                  <span className="muted">{DUE_SOURCE_LABELS[d.source]}</span>
-                  <span className="muted">{d.dueDate}</span>
-                  <span className="numeric">{formatMinor(d.amountMinor, baseCurrency)}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-      </div>
+      <section>
+        <h2>Upcoming dues (30 days)</h2>
+        {summary.upcomingDues.length === 0 ? (
+          <p className="muted">Nothing due in the next 30 days.</p>
+        ) : (
+          <ul className="upcoming-dues-list">
+            {summary.upcomingDues.map((d, i) => (
+              <li key={i}>
+                <span>{d.label}</span>
+                <span className="muted">{DUE_SOURCE_LABELS[d.source]}</span>
+                <span className="muted">{d.dueDate}</span>
+                <span className="numeric">{formatMinor(d.amountMinor, baseCurrency)}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
 
       <div className="dashboard-columns">
         <section>
