@@ -132,6 +132,29 @@ goalsRouter.post("/:id/links", (req, res) => {
   res.status(201).json(toApiShape(updated));
 });
 
+// POST /api/goals/:id/links/:linkId/unlink — remove a linked account. A
+// hard delete of the join row, not a soft "Removed" status: unlike a
+// Transaction, a Goal Account Link isn't a ledger fact worth preserving —
+// it's just "this account currently counts toward this goal," and once
+// removed it simply stops feeding the goal's Allocation-adjusted sum
+// (2.8's live-derived Status picks that up on the recompute below, same
+// as any other balance-affecting change).
+goalsRouter.post("/:id/links/:linkId/unlink", (req, res) => {
+  const goalId = Number(req.params.id);
+  const linkId = Number(req.params.linkId);
+  const goal = db.prepare("SELECT * FROM goals WHERE id = ?").get(goalId) as unknown as GoalRow | undefined;
+  if (!goal) return res.status(404).json({ errors: ["Goal not found."] });
+
+  const link = db.prepare("SELECT id FROM goal_account_links WHERE id = ? AND goal_id = ?").get(linkId, goalId);
+  if (!link) return res.status(404).json({ errors: ["Link not found."] });
+
+  db.prepare("DELETE FROM goal_account_links WHERE id = ?").run(linkId);
+
+  recomputeGoalStatus(goalId);
+  const updated = db.prepare("SELECT * FROM goals WHERE id = ?").get(goalId) as unknown as GoalRow;
+  res.json(toApiShape(updated));
+});
+
 // PATCH /api/goals/:id — the only manual transition is Active -> Abandoned
 // (2.8: Completed is always automatic, never set by hand).
 goalsRouter.patch("/:id", (req, res) => {

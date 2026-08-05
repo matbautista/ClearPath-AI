@@ -359,6 +359,7 @@ export const api = {
   listGoals: (): Promise<Goal[]> => get("/api/goals"),
   createGoal: (input: NewGoalInput): Promise<Goal> => post("/api/goals", input),
   addGoalLink: (goalId: number, input: NewGoalLinkInput): Promise<Goal> => post(`/api/goals/${goalId}/links`, input),
+  unlinkGoalLink: (goalId: number, linkId: number): Promise<Goal> => post(`/api/goals/${goalId}/links/${linkId}/unlink`),
   abandonGoal: (goalId: number): Promise<Goal> => patch(`/api/goals/${goalId}`, { status: "Abandoned" }),
 
   // recurring: utilities / income sources / tax fees / pending confirmations

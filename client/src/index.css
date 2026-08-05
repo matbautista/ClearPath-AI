@@ -508,6 +508,27 @@ button.danger:hover:not(:disabled) {
   color: var(--text-muted);
 }
 
+.goal-links li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.goal-link-remove {
+  background: none;
+  border: none;
+  padding: 0 2px;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.85rem;
+  line-height: 1;
+}
+
+.goal-link-remove:hover {
+  color: var(--danger);
+}
+
 .goal-actions {
   display: flex;
   align-items: center;

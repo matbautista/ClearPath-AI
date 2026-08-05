@@ -73,6 +73,16 @@ function GoalCard({ goal, accounts, onChange }: { goal: Goal; accounts: Account[
     onChange();
   }
 
+  async function handleUnlink(linkId: number) {
+    setErrors([]);
+    try {
+      await api.unlinkGoalLink(goal.id, linkId);
+      onChange();
+    } catch (err) {
+      setErrors(err instanceof ApiError ? err.errors : ["Something went wrong."]);
+    }
+  }
+
   return (
     <div className="goal-card">
       <div className="goal-card-header">
@@ -97,7 +107,12 @@ function GoalCard({ goal, accounts, onChange }: { goal: Goal; accounts: Account[
         <ul className="goal-links">
           {goal.links.map((l) => (
             <li key={l.id}>
-              {l.accountName} — {l.allocationType === "FixedAmount" ? formatMinor(l.allocationValue, baseCurrency) : `${l.allocationValue}%`}
+              <span>
+                {l.accountName} — {l.allocationType === "FixedAmount" ? formatMinor(l.allocationValue, baseCurrency) : `${l.allocationValue}%`}
+              </span>
+              <button type="button" className="goal-link-remove" onClick={() => handleUnlink(l.id)} aria-label={`Unlink ${l.accountName}`}>
+                ✕
+              </button>
             </li>
           ))}
         </ul>
