@@ -2,6 +2,7 @@ import { Router } from "express";
 import { db } from "../db.js";
 import { computeCurrentNetWorth } from "../lib/netWorthEngine.js";
 import { computeAccountTypeTotals, computeSavingsRate, computeUpcomingDues } from "../lib/dashboardEngine.js";
+import { isScheduledAiAnalysisDue } from "../lib/aiAnalysisEngine.js";
 
 export const dashboardRouter = Router();
 
@@ -19,6 +20,7 @@ dashboardRouter.get("/summary", (_req, res) => {
     totalCardBalanceMinor: totals.CreditCard,
     ...netWorth,
     upcomingDues: dues,
+    aiAnalysisScheduledDue: isScheduledAiAnalysisDue(),
   });
 });
 

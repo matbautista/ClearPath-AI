@@ -19,6 +19,7 @@ import { requireAuth } from "./lib/session.js";
 import { runDueRecurringRules } from "./lib/recurringEngine.js";
 import { backfillSnapshots } from "./lib/netWorthEngine.js";
 import { runMoneyPitDetection } from "./lib/moneyPitEngine.js";
+import { checkScheduledAiAnalysis } from "./lib/aiAnalysisEngine.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 // server/ and client/ are siblings under the project root (same layout
@@ -79,6 +80,8 @@ app.listen(PORT, HOST, () => {
   const moneyPits = runMoneyPitDetection();
   if (!moneyPits.skipped) console.log(`[money-pits] ${moneyPits.categoryFlags} category trend(s), ${moneyPits.clusterFlags} cluster(s)`);
 
+  checkScheduledAiAnalysis().catch((err) => console.error("[ai-analysis] scheduled check failed on startup:", err));
+
   setInterval(
     () => {
       const n = runDueRecurringRules();
@@ -86,6 +89,7 @@ app.listen(PORT, HOST, () => {
       const s = backfillSnapshots();
       if (s > 0) console.log(`[net-worth] backfilled ${s} snapshot(s)`);
       runMoneyPitDetection();
+      checkScheduledAiAnalysis().catch((err) => console.error("[ai-analysis] scheduled check failed:", err));
     },
     60 * 60 * 1000
   );

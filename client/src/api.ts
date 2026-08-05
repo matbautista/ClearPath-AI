@@ -268,6 +268,7 @@ export interface DashboardSummary {
   totalLiabilitiesMinor: number;
   netWorthMinor: number;
   upcomingDues: UpcomingDue[];
+  aiAnalysisScheduledDue: boolean;
 }
 
 export interface NetWorthTrendPoint {

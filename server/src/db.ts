@@ -306,6 +306,12 @@ function runMigrations() {
     console.log("[db] migration: added tax_fees.status");
   }
 
+  const settingsColumns = db.prepare("PRAGMA table_info(settings)").all() as { name: string }[];
+  if (!settingsColumns.some((c) => c.name === "ai_next_scheduled_run_date")) {
+    db.exec("ALTER TABLE settings ADD COLUMN ai_next_scheduled_run_date TEXT");
+    console.log("[db] migration: added settings.ai_next_scheduled_run_date");
+  }
+
   migrateAccountsAddEWallet();
   migrateAccountsAddRealEstate();
   migrateGoalsAddMajorPurchase();

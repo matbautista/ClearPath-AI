@@ -98,7 +98,9 @@ function App() {
           Log out
         </button>
       </nav>
-      {page === "dashboard" && <DashboardPage onNavigateToRecurring={() => setPage("recurring")} />}
+      {page === "dashboard" && (
+        <DashboardPage onNavigateToRecurring={() => setPage("recurring")} onNavigateToAiAssist={() => setPage("ai-assist")} />
+      )}
       {page === "accounts" && <AccountsPage />}
       {page === "transactions" && <TransactionsPage />}
       {page === "goals" && <GoalsPage />}

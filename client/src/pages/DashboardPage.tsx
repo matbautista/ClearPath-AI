@@ -63,7 +63,13 @@ function MoneyPitCard({ flag, currency, onDismiss }: { flag: MoneyPitFlag; curre
   );
 }
 
-export function DashboardPage({ onNavigateToRecurring }: { onNavigateToRecurring: () => void }) {
+export function DashboardPage({
+  onNavigateToRecurring,
+  onNavigateToAiAssist,
+}: {
+  onNavigateToRecurring: () => void;
+  onNavigateToAiAssist: () => void;
+}) {
   const { baseCurrency } = useSettings();
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [trend, setTrend] = useState<NetWorthTrendPoint[]>([]);
@@ -110,6 +116,15 @@ export function DashboardPage({ onNavigateToRecurring }: { onNavigateToRecurring
             {pending.length} recurring transaction{pending.length === 1 ? "" : "s"} awaiting confirmation — not yet reflected in the totals below.
           </span>
           <button type="button" className="secondary" onClick={onNavigateToRecurring}>
+            Review
+          </button>
+        </div>
+      )}
+
+      {summary.aiAnalysisScheduledDue && (
+        <div className="pending-callout">
+          <span>Your monthly AI analysis is ready to run (3.11).</span>
+          <button type="button" className="secondary" onClick={onNavigateToAiAssist}>
             Review
           </button>
         </div>

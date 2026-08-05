@@ -13,6 +13,7 @@ import { decrypt } from "./encryption.js";
 import { computeAccountTypeTotals, computeSavingsRate } from "./dashboardEngine.js";
 import { computeGoalProgress } from "./goalEngine.js";
 import { todayUTC, addDaysUTC } from "./dateMath.js";
+import { advanceCycle } from "./recurringEngine.js";
 
 export class AiNotConfiguredError extends Error {}
 
@@ -35,20 +36,30 @@ function buildPayload(): AnalysisPayload {
   // Same category-total computation as Category Trend Detection / Savings
   // Rate (2.4/3.1/3.11a, see schema.sql's reference query) — Debit leg
   // only, Interest Portion for debt payments, Internal Transfer and
-  // Savings/Investment Transfer excluded.
+  // Savings/Investment Transfer excluded. Additional Fees are unioned in
+  // separately, always attributed to 'Taxes/Fees' regardless of the
+  // transaction's own category (2.5 — "shows up... in the AI analysis as
+  // its own line item") — excluding a transfer's own category must not
+  // also exclude its fee, which is real spending, not part of the transfer.
   const categoryRows = db
     .prepare(
-      `SELECT sc.name as category, SUM(
-         CASE WHEN t.txn_type IN ('LoanPayment','CardPayment') THEN t.interest_portion_minor ELSE t.amount_minor END
-       ) as total_minor
-       FROM transactions t
-       JOIN spending_categories sc ON sc.id = t.spending_category_id
-       WHERE t.status = 'Posted' AND t.indicator = 'Debit' AND t.txn_date BETWEEN ? AND ?
-         AND sc.name NOT IN ('Internal Transfer', 'Savings/Investment Transfer')
-       GROUP BY sc.name
+      `SELECT category, SUM(amt) as total_minor FROM (
+         SELECT sc.name as category,
+                CASE WHEN t.txn_type IN ('LoanPayment','CardPayment') THEN t.interest_portion_minor ELSE t.amount_minor END as amt
+         FROM transactions t
+         JOIN spending_categories sc ON sc.id = t.spending_category_id
+         WHERE t.status = 'Posted' AND t.indicator = 'Debit' AND t.txn_date BETWEEN ? AND ?
+           AND sc.name NOT IN ('Internal Transfer', 'Savings/Investment Transfer')
+         UNION ALL
+         SELECT 'Taxes/Fees' as category, t.additional_fees_minor as amt
+         FROM transactions t
+         WHERE t.status = 'Posted' AND t.indicator = 'Debit' AND t.additional_fees_minor > 0
+           AND t.txn_date BETWEEN ? AND ?
+       )
+       GROUP BY category
        ORDER BY total_minor DESC`
     )
-    .all(periodStart, today) as { category: string; total_minor: number }[];
+    .all(periodStart, today, periodStart, today) as { category: string; total_minor: number }[];
   const categorySpending = categoryRows.map((r) => ({ category: r.category, totalMinor: r.total_minor }));
 
   const goalRows = db
@@ -143,5 +154,64 @@ export async function runAiAnalysis(): Promise<{ outputText: string }> {
 
   db.prepare(`INSERT INTO ai_analysis_runs (status, output_text) VALUES ('Success', ?)`).run(outputText);
   db.prepare(`UPDATE settings SET ai_last_call_at = datetime('now'), ai_call_count = ai_call_count + 1 WHERE id = 1`).run();
+  advanceScheduleIfDue();
   return { outputText };
+}
+
+// If a scheduled run was due, this run fulfills it (3.11) — regardless of
+// whether it was triggered by the Dashboard's one-tap prompt or an
+// on-demand "Analyze my finances now" click. Either way the user has
+// current analysis for this period, so there's no need to also prompt
+// them again until next month. Only advances a date that's actually due;
+// never touches a schedule that isn't due yet, and never advances on a
+// Failed run (handled by the caller, above) — a failure should stay due
+// and retry, not be silently marked done.
+function advanceScheduleIfDue() {
+  const row = db.prepare("SELECT ai_next_scheduled_run_date FROM settings WHERE id = 1").get() as
+    | { ai_next_scheduled_run_date: string | null }
+    | undefined;
+  if (!row?.ai_next_scheduled_run_date) return;
+  const today = todayUTC();
+  if (row.ai_next_scheduled_run_date > today) return;
+  let next = row.ai_next_scheduled_run_date;
+  while (next <= today) next = advanceCycle(next, "Monthly");
+  db.prepare("UPDATE settings SET ai_next_scheduled_run_date = ? WHERE id = 1").run(next);
+}
+
+interface ScheduleRow {
+  ai_analysis_enabled: number;
+  ai_scheduled_auto_run: number;
+  ai_next_scheduled_run_date: string | null;
+}
+
+function getScheduleRow(): ScheduleRow | undefined {
+  return db
+    .prepare("SELECT ai_analysis_enabled, ai_scheduled_auto_run, ai_next_scheduled_run_date FROM settings WHERE id = 1")
+    .get() as ScheduleRow | undefined;
+}
+
+// Dashboard-facing check (3.11): true only when a schedule is due AND the
+// user did NOT opt into full auto-run — that's exactly the "surfaces as a
+// one-tap prompt" default path. When auto-run is on, checkScheduledAiAnalysis
+// (below) handles it silently instead, so there's nothing to prompt for.
+export function isScheduledAiAnalysisDue(): boolean {
+  const row = getScheduleRow();
+  if (!row || !row.ai_analysis_enabled || row.ai_scheduled_auto_run || !row.ai_next_scheduled_run_date) return false;
+  return row.ai_next_scheduled_run_date <= todayUTC();
+}
+
+// Background job (index.ts) — same "check on boot + hourly" pattern as
+// runDueRecurringRules (2.7). Only acts when the user explicitly opted
+// into ai_scheduled_auto_run; otherwise this is a no-op and the schedule
+// just stays due for isScheduledAiAnalysisDue/the Dashboard prompt above.
+export async function checkScheduledAiAnalysis(): Promise<void> {
+  const row = getScheduleRow();
+  if (!row || !row.ai_analysis_enabled || !row.ai_scheduled_auto_run || !row.ai_next_scheduled_run_date) return;
+  if (row.ai_next_scheduled_run_date > todayUTC()) return;
+  try {
+    await runAiAnalysis();
+  } catch {
+    // Already recorded as a Failed run inside runAiAnalysis — nothing
+    // further to do; the schedule stays due and retries next check.
+  }
 }

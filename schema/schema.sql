@@ -91,6 +91,7 @@ CREATE TABLE settings (
     ai_api_key_encrypted        BLOB,                          -- (3.11)
     ai_provider                 TEXT,                          -- (3.11)
     ai_scheduled_auto_run       INTEGER NOT NULL DEFAULT 0,    -- boolean; opt-in full auto-run (3.11)
+    ai_next_scheduled_run_date TEXT,                          -- next monthly cadence date (3.11); NULL while AI Analysis is disabled
     ai_last_call_at             TEXT,                          -- ISO 8601 datetime (3.11 cost visibility)
     ai_call_count               INTEGER NOT NULL DEFAULT 0,    -- (3.11 cost visibility)
     notification_email          TEXT,                          -- (4.5)
@@ -435,17 +436,29 @@ CREATE TABLE ai_analysis_runs (
 -- SELECT MIN(:day_of_month, CAST(strftime('%d', date(:year || '-' || :month || '-01', '+1 month', '-1 day')) AS INTEGER))
 --        AS clamped_day_of_month;
 
--- Category totals (Category Trend Detection 3.11a / Savings Rate 3.1):
--- count a linked pair once, off the Debit leg only, per 2.2's rule —
--- e.g. for Debt Payment, only the Debit leg's interest_portion_minor:
+-- Category totals (Category Trend Detection 3.11a / Savings Rate 3.1 / AI
+-- Analysis 3.11): count a linked pair once, off the Debit leg only, per
+-- 2.2's rule — e.g. for Debt Payment, only the Debit leg's
+-- interest_portion_minor. Additional Fees are unioned in separately,
+-- always attributed to 'Taxes/Fees' regardless of the transaction's own
+-- category (2.5 — "tracked under the 'Taxes/Fees' spending category...
+-- as its own line item") — a transfer's own category (e.g. Internal
+-- Transfer) is excluded below, but its fee is still real spending, not
+-- part of the transfer, so it must not be excluded along with it:
 --
--- SELECT spending_category_id, SUM(
+-- SELECT categoryId, SUM(amt) AS category_total_minor FROM (
+--   SELECT spending_category_id AS categoryId,
 --          CASE WHEN txn_type IN ('LoanPayment','CardPayment')
---               THEN interest_portion_minor ELSE amount_minor END
---        ) AS category_total_minor
--- FROM transactions
--- WHERE status = 'Posted' AND indicator = 'Debit'
---   AND spending_category_id NOT IN (
---       SELECT id FROM spending_categories WHERE name IN ('Internal Transfer','Savings/Investment Transfer')
---   )
--- GROUP BY spending_category_id;
+--               THEN interest_portion_minor ELSE amount_minor END AS amt
+--   FROM transactions
+--   WHERE status = 'Posted' AND indicator = 'Debit' AND spending_category_id IS NOT NULL
+--     AND spending_category_id NOT IN (
+--         SELECT id FROM spending_categories WHERE name IN ('Internal Transfer','Savings/Investment Transfer')
+--     )
+--   UNION ALL
+--   SELECT (SELECT id FROM spending_categories WHERE name = 'Taxes/Fees') AS categoryId,
+--          additional_fees_minor AS amt
+--   FROM transactions
+--   WHERE status = 'Posted' AND indicator = 'Debit' AND additional_fees_minor > 0
+-- )
+-- GROUP BY categoryId;

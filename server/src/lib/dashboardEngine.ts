@@ -33,19 +33,28 @@ export function computeSavingsRate(startDate: string, endDate: string): { income
     )
     .get(startDate, endDate) as { total: number };
 
+  // Additional Fees are unioned in separately, always counted as expense
+  // regardless of the transaction's own category (2.5) — a transfer's own
+  // category (Internal Transfer/Savings-Investment Transfer) is excluded
+  // below, but its fee is still real spending, not part of the transfer.
   const expense = db
     .prepare(
-      `SELECT COALESCE(SUM(
-         CASE WHEN txn_type IN ('LoanPayment','CardPayment') THEN interest_portion_minor ELSE amount_minor END
-       ), 0) as total
-       FROM transactions
-       WHERE status = 'Posted' AND indicator = 'Debit' AND txn_date BETWEEN ? AND ?
-         AND spending_category_id IS NOT NULL
-         AND spending_category_id NOT IN (
-           SELECT id FROM spending_categories WHERE name IN ('Internal Transfer', 'Savings/Investment Transfer')
-         )`
+      `SELECT COALESCE(SUM(amt), 0) as total FROM (
+         SELECT CASE WHEN txn_type IN ('LoanPayment','CardPayment') THEN interest_portion_minor ELSE amount_minor END as amt
+         FROM transactions
+         WHERE status = 'Posted' AND indicator = 'Debit' AND txn_date BETWEEN ? AND ?
+           AND spending_category_id IS NOT NULL
+           AND spending_category_id NOT IN (
+             SELECT id FROM spending_categories WHERE name IN ('Internal Transfer', 'Savings/Investment Transfer')
+           )
+         UNION ALL
+         SELECT additional_fees_minor as amt
+         FROM transactions
+         WHERE status = 'Posted' AND indicator = 'Debit' AND additional_fees_minor > 0
+           AND txn_date BETWEEN ? AND ?
+       )`
     )
-    .get(startDate, endDate) as { total: number };
+    .get(startDate, endDate, startDate, endDate) as { total: number };
 
   const incomeMinor = income.total;
   const expenseMinor = expense.total;

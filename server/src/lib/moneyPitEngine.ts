@@ -53,16 +53,30 @@ function detectCategoryTrends(): CategoryTrendResult[] {
   const currentMonth = monthKey(todayUTC());
   const lookbackStart = shiftMonthKey(currentMonth, -3) + "-01";
 
+  // Additional Fees are unioned in separately, always attributed to
+  // 'Taxes/Fees' regardless of the transaction's own category (2.5 — a
+  // transfer's own category, e.g. Internal Transfer, is excluded below,
+  // but its fee is still real spending, not part of the transfer). Same
+  // pattern as dashboardEngine.ts's computeSavingsRate and
+  // aiAnalysisEngine.ts's buildPayload — see schema.sql's reference query.
   const rows = db
     .prepare(
-      `SELECT spending_category_id as categoryId, strftime('%Y-%m', txn_date) as ym,
-              SUM(CASE WHEN txn_type IN ('LoanPayment','CardPayment') THEN interest_portion_minor ELSE amount_minor END) as total
-       FROM transactions
-       WHERE status = 'Posted' AND indicator = 'Debit' AND spending_category_id IS NOT NULL
-         AND txn_date >= ?
-       GROUP BY spending_category_id, ym`
+      `SELECT categoryId, ym, SUM(amt) as total FROM (
+         SELECT spending_category_id as categoryId, strftime('%Y-%m', txn_date) as ym,
+                CASE WHEN txn_type IN ('LoanPayment','CardPayment') THEN interest_portion_minor ELSE amount_minor END as amt
+         FROM transactions
+         WHERE status = 'Posted' AND indicator = 'Debit' AND spending_category_id IS NOT NULL
+           AND txn_date >= ?
+         UNION ALL
+         SELECT (SELECT id FROM spending_categories WHERE name = 'Taxes/Fees') as categoryId,
+                strftime('%Y-%m', txn_date) as ym, additional_fees_minor as amt
+         FROM transactions
+         WHERE status = 'Posted' AND indicator = 'Debit' AND additional_fees_minor > 0
+           AND txn_date >= ?
+       )
+       GROUP BY categoryId, ym`
     )
-    .all(lookbackStart) as { categoryId: number; ym: string; total: number }[];
+    .all(lookbackStart, lookbackStart) as { categoryId: number; ym: string; total: number }[];
 
   const byCategory = new Map<number, Map<string, number>>();
   for (const r of rows) {

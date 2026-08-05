@@ -3,6 +3,8 @@ import { db } from "../db.js";
 import { hashPassphrase, verifyPassphrase } from "../lib/passphrase.js";
 import { createSession, destroySession, SESSION_COOKIE, requireAuth } from "../lib/session.js";
 import { encrypt } from "../lib/encryption.js";
+import { advanceCycle } from "../lib/recurringEngine.js";
+import { todayUTC } from "../lib/dateMath.js";
 
 export const settingsRouter = Router();
 
@@ -20,6 +22,7 @@ interface SettingsRow {
   ai_analysis_enabled: number;
   ai_provider: string | null;
   ai_scheduled_auto_run: number;
+  ai_next_scheduled_run_date: string | null;
   ai_last_call_at: string | null;
   ai_call_count: number;
   notification_email: string | null;
@@ -133,6 +136,19 @@ settingsRouter.patch("/ai", requireAuth, (req, res) => {
   if (aiAnalysisEnabled !== undefined) {
     sets.push("ai_analysis_enabled = ?");
     values.push(aiAnalysisEnabled ? 1 : 0);
+    if (aiAnalysisEnabled) {
+      // Starts the monthly schedule (3.11) the moment AI Analysis is
+      // enabled — but only if one isn't already running: a disable then
+      // re-enable shouldn't reset a still-valid schedule, only a genuinely
+      // fresh enable (no ai_next_scheduled_run_date yet) needs one.
+      if (!row.ai_next_scheduled_run_date) {
+        sets.push("ai_next_scheduled_run_date = ?");
+        values.push(advanceCycle(todayUTC(), "Monthly"));
+      }
+    } else {
+      sets.push("ai_next_scheduled_run_date = ?");
+      values.push(null);
+    }
   }
   if (aiProvider !== undefined) {
     sets.push("ai_provider = ?");
