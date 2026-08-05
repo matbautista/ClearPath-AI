@@ -348,6 +348,20 @@ button.secondary:hover:not(:disabled) {
   background: var(--status-active-bg);
 }
 
+button.danger {
+  background: transparent;
+  color: var(--danger);
+  border: 1px solid var(--danger);
+}
+
+button.danger:hover:not(:disabled) {
+  background: var(--danger-bg);
+}
+
+.danger-zone {
+  border: 1px solid var(--danger);
+}
+
 /* --- Auth pages (Setup / Login) --- */
 .auth-page {
   min-height: 100vh;

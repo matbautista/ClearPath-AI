@@ -153,6 +153,65 @@ settingsRouter.patch("/ai", requireAuth, (req, res) => {
   res.json({ ok: true });
 });
 
+// Every table except settings/spending_categories, which get special
+// handling below.
+const RESET_TABLES = [
+  "money_pit_flag_transactions",
+  "money_pit_flags",
+  "ai_analysis_runs",
+  "net_worth_snapshots",
+  "goal_account_links",
+  "goals",
+  "recurring_rules",
+  "tax_fees",
+  "income_sources",
+  "utilities",
+  "transactions",
+  "accounts",
+];
+
+// POST /api/settings/reset — wipes all app data and returns the instance to
+// its pre-Setup state (2.0/4.3), for starting over or for wiping this
+// machine's copy before/after moving to another one (DEPLOY.md "Moving to
+// another machine"). Requires re-entering the current passphrase as
+// confirmation — the one genuinely irreversible action in the app.
+settingsRouter.post("/reset", requireAuth, (req, res) => {
+  const row = getSettingsRow();
+  if (!row) return res.status(404).json({ errors: ["Not set up yet."] });
+
+  const { passphrase } = req.body as { passphrase?: string };
+  if (!passphrase || !verifyPassphrase(passphrase, row.auth_passphrase_hash)) {
+    // 422, not 401: the request is already authenticated (requireAuth
+    // passed) — this is confirmation-input validation, not a session
+    // failure. A 401 here would trip the client's global "any 401 means
+    // session expired" handler (api.ts) and silently bounce to Login
+    // before this error ever reached the Settings page's own handling.
+    return res.status(422).json({ errors: ["Incorrect passphrase."] });
+  }
+
+  db.exec("PRAGMA foreign_keys = OFF");
+  db.exec("BEGIN");
+  try {
+    for (const table of RESET_TABLES) db.exec(`DELETE FROM ${table}`);
+    // Keep the seeded system categories (2.4) intact — money-pit/savings-rate
+    // logic depends on the default set existing by name, and re-inserting it
+    // here would duplicate schema.sql's seed list. Only user-added categories
+    // (is_system = 0) are cleared.
+    db.exec("DELETE FROM spending_categories WHERE is_system = 0");
+    db.exec("DELETE FROM settings");
+    db.exec("COMMIT");
+  } catch (err) {
+    db.exec("ROLLBACK");
+    throw err;
+  } finally {
+    db.exec("PRAGMA foreign_keys = ON");
+  }
+
+  destroySession(req.cookies?.[SESSION_COOKIE]);
+  res.clearCookie(SESSION_COOKIE);
+  res.json({ ok: true });
+});
+
 function hasStoredApiKey(): boolean {
   const row = db.prepare("SELECT ai_api_key_encrypted FROM settings WHERE id = 1").get() as
     | { ai_api_key_encrypted: Uint8Array | null }

@@ -17,6 +17,11 @@ export function SettingsPage() {
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  const [confirmingReset, setConfirmingReset] = useState(false);
+  const [resetPassphrase, setResetPassphrase] = useState("");
+  const [resetErrors, setResetErrors] = useState<string[]>([]);
+  const [resetting, setResetting] = useState(false);
+
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
@@ -37,6 +42,22 @@ export function SettingsPage() {
       setErrors(err instanceof ApiError ? err.errors : ["Something went wrong."]);
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleReset(e: React.FormEvent) {
+    e.preventDefault();
+    setResetting(true);
+    setResetErrors([]);
+    try {
+      await api.resetDatabase(resetPassphrase);
+      // Settings row is gone server-side, so a full reload is the simplest
+      // way back to a clean app state — App.tsx's status check will land
+      // on the Setup page on its own, same as any other fresh instance.
+      window.location.reload();
+    } catch (err) {
+      setResetErrors(err instanceof ApiError ? err.errors : ["Something went wrong."]);
+      setResetting(false);
     }
   }
 
@@ -108,6 +129,57 @@ export function SettingsPage() {
             {saving ? "Saving…" : "Save"}
           </button>
         </form>
+      </section>
+
+      <section className="new-transaction-form danger-zone">
+        <h2>Danger zone</h2>
+        <p className="muted">
+          Permanently deletes every account, transaction, goal, and recurring rule, and
+          returns this instance to a blank pre-setup state — same as a brand-new install.
+          Use this to start over, or to wipe this machine's copy before moving to another
+          one (see DEPLOY.md). There is no undo — back up <code>data/clearpath.db</code>{" "}
+          first if you're not sure.
+        </p>
+        {confirmingReset ? (
+          <form onSubmit={handleReset}>
+            <label>
+              Enter your passphrase to confirm
+              <input
+                type="password"
+                value={resetPassphrase}
+                onChange={(e) => setResetPassphrase(e.target.value)}
+                autoComplete="off"
+              />
+            </label>
+            {resetErrors.length > 0 && (
+              <ul className="form-errors">
+                {resetErrors.map((err) => (
+                  <li key={err}>{err}</li>
+                ))}
+              </ul>
+            )}
+            <div className="field-row">
+              <button type="submit" className="danger" disabled={resetting || resetPassphrase === ""}>
+                {resetting ? "Clearing…" : "Yes, clear everything"}
+              </button>
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => {
+                  setConfirmingReset(false);
+                  setResetPassphrase("");
+                  setResetErrors([]);
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        ) : (
+          <button type="button" className="danger" onClick={() => setConfirmingReset(true)}>
+            Clear database…
+          </button>
+        )}
       </section>
     </div>
   );

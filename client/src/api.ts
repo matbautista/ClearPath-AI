@@ -332,6 +332,7 @@ export const api = {
   logout: (): Promise<{ ok: true }> => post("/api/settings/logout"),
   me: (): Promise<Settings> => get("/api/settings/me"),
   updateAiSettings: (input: UpdateAiSettingsInput): Promise<{ ok: true }> => patch("/api/settings/ai", input),
+  resetDatabase: (passphrase: string): Promise<{ ok: true }> => post("/api/settings/reset", { passphrase }),
 
   // AI Analysis (3.11)
   runAiAnalysis: (): Promise<{ outputText: string }> => post("/api/ai-analysis/run"),
