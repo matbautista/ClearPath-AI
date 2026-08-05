@@ -41,6 +41,32 @@ function accountBalance(link: LinkRow): number {
   return link.account_type === "CreditCard" ? link.card_balance_minor : link.current_balance_minor;
 }
 
+function rawShare(allocationType: "FixedAmount" | "Percentage", allocationValue: number, balance: number): number {
+  return allocationType === "FixedAmount" ? Math.min(allocationValue, balance) : Math.floor((balance * allocationValue) / 100);
+}
+
+// The same account can be linked to multiple goals (3.10), and
+// validateAllocation only checks over-commitment at link-creation time —
+// it never re-checks once the balance later drops below what's already
+// allocated. So by the time progress is computed, an account's combined
+// allocations across every goal claiming it can add up to more than the
+// account actually holds. Total raw claims on that account (excluding
+// Abandoned goals, which no longer hold capacity, and DebtPayoff, which
+// doesn't use allocations) — used to scale every claim down proportionally
+// so goals sharing an over-committed account can't each count the same
+// real money.
+function accountTotalRawShare(accountId: number, balance: number): number {
+  const links = db
+    .prepare(
+      `SELECT gal.allocation_type, gal.allocation_value
+       FROM goal_account_links gal
+       JOIN goals g ON g.id = gal.goal_id
+       WHERE gal.account_id = ? AND g.status != 'Abandoned' AND g.goal_type != 'DebtPayoff'`
+    )
+    .all(accountId) as { allocation_type: "FixedAmount" | "Percentage"; allocation_value: number }[];
+  return links.reduce((sum, l) => sum + rawShare(l.allocation_type, l.allocation_value, balance), 0);
+}
+
 export interface GoalProgress {
   currentAmountMinor: number;
   targetAmountMinor: number;
@@ -53,6 +79,9 @@ export interface GoalProgress {
 // amount" is the Allocation-adjusted sum of linked balances against
 // Target Amount (3.10) — the same computation both the progress bar
 // and the completion check use, so they can't disagree with each other.
+// Each link's raw share is additionally scaled down whenever its account
+// is over-committed (see accountTotalRawShare) so two goals sharing an
+// account can't both count the same dollars.
 export function computeGoalProgress(goalId: number): GoalProgress | null {
   const data = getGoalWithLinks(goalId);
   if (!data) return null;
@@ -66,9 +95,10 @@ export function computeGoalProgress(goalId: number): GoalProgress | null {
 
   const contribution = links.reduce((sum, l) => {
     const balance = accountBalance(l);
-    const share =
-      l.allocation_type === "FixedAmount" ? Math.min(l.allocation_value, balance) : Math.floor((balance * l.allocation_value) / 100);
-    return sum + share;
+    const share = rawShare(l.allocation_type, l.allocation_value, balance);
+    const totalClaimed = accountTotalRawShare(l.account_id, balance);
+    const realizedShare = totalClaimed > balance ? Math.floor((share * balance) / totalClaimed) : share;
+    return sum + realizedShare;
   }, 0);
   const isComplete = contribution >= goal.target_amount_minor;
   return { currentAmountMinor: contribution, targetAmountMinor: goal.target_amount_minor, isComplete };
