@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, type Request } from "express";
 import { db } from "../db.js";
 import { hashPassphrase, verifyPassphrase } from "../lib/passphrase.js";
 import { createSession, destroySession, SESSION_COOKIE, requireAuth } from "../lib/session.js";
@@ -9,12 +9,32 @@ import { todayUTC } from "../lib/dateMath.js";
 
 export const settingsRouter = Router();
 
-const COOKIE_OPTS = {
-  httpOnly: true,
-  sameSite: "lax" as const,
-  // NOTE: `secure: true` should be turned on once this is served over
-  // HTTPS (4.3 requires TLS for the app itself) — left off for local dev.
-};
+// A connection reaching this specific request over loopback never leaves
+// the machine even over plain HTTP, so `secure` would just break local
+// access for no protection gained. Anything else (start.bat's LAN default,
+// HOST=0.0.0.0, or a real deployment) must not send the session cookie in
+// the clear — this fails closed: without a TLS reverse proxy in front (see
+// DEPLOY.md), the browser will silently refuse to store the cookie and
+// login will stop working, rather than quietly leaking the
+// passphrase/cookie to anyone on the network.
+//
+// This has to be checked per-request via the socket's actual local
+// address, not via `process.env.HOST` — start.bat always sets
+// HOST=0.0.0.0 to allow LAN access, so a static check against HOST would
+// mark every connection insecure, including the user's own 127.0.0.1
+// access on the same machine, breaking login there too.
+function isLoopbackRequest(req: Request): boolean {
+  const addr = req.socket.localAddress;
+  return addr === "127.0.0.1" || addr === "::1" || addr === "::ffff:127.0.0.1";
+}
+
+function cookieOpts(req: Request) {
+  return {
+    httpOnly: true,
+    sameSite: "lax" as const,
+    secure: !isLoopbackRequest(req),
+  };
+}
 
 interface SettingsRow {
   id: number;
@@ -63,7 +83,7 @@ settingsRouter.post("/setup", (req, res) => {
   ).run(baseCurrency!, hashPassphrase(passphrase!));
 
   const token = createSession();
-  res.cookie(SESSION_COOKIE, token, COOKIE_OPTS);
+  res.cookie(SESSION_COOKIE, token, cookieOpts(req));
   res.status(201).json({ baseCurrency });
 });
 
@@ -89,7 +109,7 @@ settingsRouter.post("/login", (req, res) => {
   }
   recordLoginSuccess(rateLimitKey);
   const token = createSession();
-  res.cookie(SESSION_COOKIE, token, COOKIE_OPTS);
+  res.cookie(SESSION_COOKIE, token, cookieOpts(req));
   res.json({ ok: true });
 });
 

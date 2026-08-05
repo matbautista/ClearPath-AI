@@ -45,17 +45,23 @@ network can reach it; it's not exposed to the internet unless your router is
 specifically configured to forward the port (routers don't do this by
 default).
 
-**There is no HTTPS in front of this.** Your login passphrase and session
-cookie cross your Wi-Fi in plaintext on every request. On a trusted home
-network this is a manageable risk, but anyone else who can see your Wi-Fi
-traffic (another device on the same network, a compromised router, a public
-or shared network) can too. If you want that closed, put a reverse proxy
-(e.g. Caddy or Tailscale) providing TLS in front of the app — ask if you
-want that set up.
+**LAN access needs HTTPS in front of it, or login won't work.** The session
+cookie is only ever sent over a secure connection when the server isn't
+bound to loopback — so if you access it via the LAN IP over plain HTTP,
+the browser will refuse to store the cookie: you'll appear to log in, then
+immediately bounce back to the login screen. This is deliberate — it fails
+closed instead of quietly sending your passphrase and session cookie across
+the Wi-Fi in plaintext, where anyone else who can see that traffic (another
+device on the same network, a compromised router, a public or shared
+network) could too.
 
-If you'd rather go back to loopback-only (no LAN access, no plaintext
-exposure), edit `start.bat` and delete the `set HOST=0.0.0.0` line — the
-server defaults to `127.0.0.1` on its own.
+To actually use it from another device, put a reverse proxy (e.g. Caddy or
+Tailscale) providing TLS in front of the app — ask if you want that set up.
+Access from `127.0.0.1` on the same PC always works over plain HTTP, since
+that traffic never leaves the machine.
+
+If you don't need LAN access, edit `start.bat` and delete the
+`set HOST=0.0.0.0` line — the server defaults to `127.0.0.1` on its own.
 
 ## Moving to another machine
 
