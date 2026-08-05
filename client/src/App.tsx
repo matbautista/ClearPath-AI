@@ -52,9 +52,21 @@ function App() {
   }, []);
 
   async function handleAuthenticated() {
-    const me = await api.me();
-    setSettings(me);
-    setPhase("app");
+    try {
+      const me = await api.me();
+      setSettings(me);
+      setPhase("app");
+    } catch {
+      // A failure here, right after a successful login/setup call, means
+      // something changed server-side in that exact window (e.g. another
+      // device on the LAN reset the instance via Settings' Danger Zone) —
+      // re-resolve from scratch rather than letting the caller (Login/Setup
+      // page) show a generic "something went wrong" for what was, from the
+      // user's perspective, a successful login. resolveAuthState() already
+      // knows how to route correctly: back to Setup if the instance is no
+      // longer configured, or Login if the session didn't take.
+      await resolveAuthState();
+    }
   }
 
   async function handleLogout() {

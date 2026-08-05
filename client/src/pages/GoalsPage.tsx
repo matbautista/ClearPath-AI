@@ -28,8 +28,14 @@ function GoalCard({ goal, accounts, onChange }: { goal: Goal; accounts: Account[
   });
 
   const targetLabel = isDebtPayoff ? "Paid off" : formatMinor(goal.targetAmountMinor, baseCurrency);
+  // An unlinked Debt Payoff goal would otherwise show "₱0.00 remaining" —
+  // indistinguishable from "this debt is paid off." Call out the empty
+  // state explicitly instead; every other goal type already has this
+  // covered by its "₱0.00 of ₱X target" phrasing.
   const currentLabel = isDebtPayoff
-    ? `${formatMinor(goal.currentAmountMinor, baseCurrency)} remaining`
+    ? goal.links.length === 0
+      ? "No debts linked yet"
+      : `${formatMinor(goal.currentAmountMinor, baseCurrency)} remaining`
     : formatMinor(goal.currentAmountMinor, baseCurrency);
   // Debt Payoff has no stored "starting balance" baseline to compute a
   // proportional fill from, so the bar is binary here: full once every

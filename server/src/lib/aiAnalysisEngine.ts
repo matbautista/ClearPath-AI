@@ -140,11 +140,15 @@ export async function runAiAnalysis(): Promise<{ outputText: string }> {
     throw new AiNotConfiguredError("No AI provider or API key is configured. Add one in Settings first.");
   }
 
-  const apiKey = decrypt(Buffer.from(settingsRow.ai_api_key_encrypted));
-  const payload = buildPayload();
-
   let outputText: string;
   try {
+    // decrypt()/buildPayload() are inside this try too (not just
+    // callAnthropic) — a stale/rotated data/master.key throws here (AES-GCM
+    // auth-tag mismatch), and that failure needs recording exactly like an
+    // API failure, matching this function's own "a Failed run is recorded
+    // with the real error message" contract above.
+    const apiKey = decrypt(Buffer.from(settingsRow.ai_api_key_encrypted));
+    const payload = buildPayload();
     outputText = await callAnthropic(apiKey, payload);
   } catch (err) {
     const message = err instanceof Anthropic.APIError ? err.message : (err as Error).message;

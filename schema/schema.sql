@@ -409,9 +409,13 @@ CREATE TABLE ai_analysis_runs (
 -- from transaction history — should always match the cached column (2.1's
 -- "derived, not cached" rule). Debit reduces the row's own account per the
 -- direction convention in 2.2; Credit increases it. Only Posted rows count.
+-- Additional Fees are included (2.5 — debited from the source leg only;
+-- always 0 on a destination leg, so adding it in both CASE branches is
+-- harmless there and correct on the source leg):
 --
 -- SELECT source_account_id,
---        SUM(CASE WHEN indicator = 'Credit' THEN amount_minor ELSE -amount_minor END) AS recomputed_delta
+--        SUM(CASE WHEN indicator = 'Credit' THEN amount_minor + additional_fees_minor
+--                 ELSE -(amount_minor + additional_fees_minor) END) AS recomputed_delta
 -- FROM transactions
 -- WHERE status = 'Posted'
 -- GROUP BY source_account_id;

@@ -121,8 +121,12 @@ incomeSourcesRouter.patch("/:id", (req, res) => {
 
 // PATCH /api/income-sources/:id/status — pause/resume, e.g. a contract or
 // gig that ended. Mirrors utilities.ts's status endpoint: the recurring job
-// stops drafting deposits and it drops off Upcoming Dues, but history and
-// the record itself stay intact for reactivation later.
+// stops drafting deposits, but history and the record itself stay intact
+// for reactivation later. Unlike utilities/tax-fees, this has no effect on
+// Upcoming Dues either way — Income Sources were never in that list to
+// begin with (dashboardEngine.ts's computeUpcomingDues deliberately
+// excludes income; the spec's list is "loans, cards, utilities, taxes,"
+// not money coming in).
 incomeSourcesRouter.patch("/:id/status", (req, res) => {
   const { status } = req.body as { status?: string };
   if (status !== "Active" && status !== "Paused") return res.status(422).json({ errors: ["Status must be 'Active' or 'Paused'."] });
