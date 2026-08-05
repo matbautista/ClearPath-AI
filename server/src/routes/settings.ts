@@ -2,6 +2,7 @@ import { Router } from "express";
 import { db } from "../db.js";
 import { hashPassphrase, verifyPassphrase } from "../lib/passphrase.js";
 import { createSession, destroySession, SESSION_COOKIE, requireAuth } from "../lib/session.js";
+import { checkLoginRateLimit, recordLoginFailure, recordLoginSuccess } from "../lib/loginRateLimit.js";
 import { encrypt } from "../lib/encryption.js";
 import { advanceCycle } from "../lib/recurringEngine.js";
 import { todayUTC } from "../lib/dateMath.js";
@@ -69,10 +70,24 @@ settingsRouter.post("/setup", (req, res) => {
 settingsRouter.post("/login", (req, res) => {
   const row = getSettingsRow();
   if (!row) return res.status(409).json({ errors: ["Not set up yet — use /setup first."] });
+
+  // Throttle by IP before touching the passphrase at all, so a locked-out
+  // attacker can't keep spending scrypt cycles against this instance.
+  const rateLimitKey = req.ip ?? "unknown";
+  const rateLimit = checkLoginRateLimit(rateLimitKey);
+  if (!rateLimit.allowed) {
+    res.setHeader("Retry-After", String(rateLimit.retryAfterSeconds));
+    return res.status(429).json({
+      errors: [`Too many failed attempts. Try again in ${Math.ceil(rateLimit.retryAfterSeconds / 60)} minute(s).`],
+    });
+  }
+
   const { passphrase } = req.body as { passphrase?: string };
   if (!passphrase || !verifyPassphrase(passphrase, row.auth_passphrase_hash)) {
+    recordLoginFailure(rateLimitKey);
     return res.status(401).json({ errors: ["Incorrect passphrase."] });
   }
+  recordLoginSuccess(rateLimitKey);
   const token = createSession();
   res.cookie(SESSION_COOKIE, token, COOKIE_OPTS);
   res.json({ ok: true });
