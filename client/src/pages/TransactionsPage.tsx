@@ -175,9 +175,10 @@ export function TransactionsPage() {
               <tr>
                 <th>Date</th>
                 <th>Type</th>
+                <th>Account</th>
                 <th>Category</th>
                 <th className="numeric">Amount</th>
-                <th>To</th>
+                <th>Counterparty</th>
                 <th>Status</th>
                 <th></th>
               </tr>
@@ -187,12 +188,19 @@ export function TransactionsPage() {
                 <tr key={t.id} className={t.status === "Voided" ? "txn-voided" : undefined}>
                   <td>{t.txnDate}</td>
                   <td>{TXN_TYPE_LABELS[t.txnType] ?? t.txnType}</td>
+                  <td>{t.sourceAccountName}</td>
                   <td className="muted">{t.spendingCategoryName ?? t.incomeCategory ?? "—"}</td>
                   <td className="numeric">
                     {t.indicator === "Debit" ? "-" : "+"}
                     {formatMinor(t.amountMinor, baseCurrency)}
                   </td>
-                  <td className="muted">{t.destinationAccountName ?? "—"}</td>
+                  <td className="muted">
+                    {t.destinationAccountName
+                      ? t.indicator === "Debit"
+                        ? `→ ${t.destinationAccountName}`
+                        : `← ${t.destinationAccountName}`
+                      : "—"}
+                  </td>
                   <td>
                     {t.status !== "Posted" && (
                       <span className={`status-pill status-${t.status.toLowerCase()}`}>{t.status}</span>

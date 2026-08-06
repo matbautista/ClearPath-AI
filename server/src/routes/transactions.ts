@@ -17,10 +17,12 @@ transactionsRouter.get("/", (req, res) => {
   const rows = accountId
     ? db
         .prepare(
-          `SELECT t.*, sc.name AS spending_category_name, a.account_name AS destination_account_name
+          `SELECT t.*, sc.name AS spending_category_name,
+                  d.account_name AS destination_account_name, s.account_name AS source_account_name
            FROM transactions t
            LEFT JOIN spending_categories sc ON sc.id = t.spending_category_id
-           LEFT JOIN accounts a ON a.id = t.destination_account_id
+           LEFT JOIN accounts d ON d.id = t.destination_account_id
+           LEFT JOIN accounts s ON s.id = t.source_account_id
            WHERE t.source_account_id = ?
            ORDER BY t.txn_date DESC, t.id DESC
            LIMIT 200`
@@ -28,10 +30,12 @@ transactionsRouter.get("/", (req, res) => {
         .all(accountId)
     : db
         .prepare(
-          `SELECT t.*, sc.name AS spending_category_name, a.account_name AS destination_account_name
+          `SELECT t.*, sc.name AS spending_category_name,
+                  d.account_name AS destination_account_name, s.account_name AS source_account_name
            FROM transactions t
            LEFT JOIN spending_categories sc ON sc.id = t.spending_category_id
-           LEFT JOIN accounts a ON a.id = t.destination_account_id
+           LEFT JOIN accounts d ON d.id = t.destination_account_id
+           LEFT JOIN accounts s ON s.id = t.source_account_id
            ORDER BY t.txn_date DESC, t.id DESC
            LIMIT 200`
         )
@@ -46,6 +50,7 @@ transactionsRouter.get("/", (req, res) => {
       additionalFeesMinor: r.additional_fees_minor,
       indicator: r.indicator,
       sourceAccountId: r.source_account_id,
+      sourceAccountName: r.source_account_name,
       destinationAccountId: r.destination_account_id,
       destinationAccountName: r.destination_account_name,
       txnType: r.txn_type,

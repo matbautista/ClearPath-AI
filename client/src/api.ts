@@ -101,6 +101,7 @@ export interface Transaction {
   additionalFeesMinor: number;
   indicator: "Debit" | "Credit";
   sourceAccountId: number;
+  sourceAccountName: string;
   destinationAccountId: number | null;
   destinationAccountName: string | null;
   txnType: string;
