@@ -32,6 +32,7 @@ export function AccountsPage() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [typeFilter, setTypeFilter] = useState<AccountType | "All">("All");
   const [statusFilter, setStatusFilter] = useState<AccountStatus | "All">("All");
+  const [collapsedTypes, setCollapsedTypes] = useState<Set<AccountType>>(new Set());
 
   function load() {
     setLoading(true);
@@ -142,6 +143,23 @@ export function AccountsPage() {
     return <div className="balance-primary">{formatMinor(account.currentBalanceMinor ?? 0, baseCurrency)}</div>;
   }
 
+  // Credit Card balance is "owed", tracked in its own column
+  // (card_balance_minor) rather than current_balance_minor — same split
+  // balanceDisplay already makes, kept in one place so a group subtotal
+  // means the same thing as the row above it.
+  function accountBalanceMinor(account: Account): number {
+    return account.accountType === "CreditCard" ? account.cardBalanceMinor ?? 0 : account.currentBalanceMinor ?? 0;
+  }
+
+  function toggleType(type: AccountType) {
+    setCollapsedTypes((prev) => {
+      const next = new Set(prev);
+      if (next.has(type)) next.delete(type);
+      else next.add(type);
+      return next;
+    });
+  }
+
   const isCreditCard = form.accountType === "CreditCard";
   const isLoan = form.accountType === "Loan";
   const isLoanOrCard = isLoan || isCreditCard;
@@ -152,6 +170,14 @@ export function AccountsPage() {
   const filteredAccounts = accounts.filter(
     (a) => (typeFilter === "All" || a.accountType === typeFilter) && (statusFilter === "All" || a.status === statusFilter)
   );
+
+  // Fixed canonical order (ACCOUNT_TYPES) rather than first-appearance —
+  // unlike transaction types, account types are a small fixed enum, so a
+  // stable known order reads better than one that reshuffles as filters change.
+  const accountGroups = ACCOUNT_TYPES.map((type) => ({
+    type,
+    accounts: filteredAccounts.filter((a) => a.accountType === type),
+  })).filter((g) => g.accounts.length > 0);
 
   return (
     <div className="page">
@@ -187,6 +213,26 @@ export function AccountsPage() {
             </label>
           </div>
         )}
+        {!loading && accountGroups.length > 1 && (
+          <div className="field-row" style={{ marginBottom: 12 }}>
+            <label>
+              &nbsp;
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => setCollapsedTypes(new Set(accountGroups.map((g) => g.type)))}
+              >
+                Collapse all
+              </button>
+            </label>
+            <label>
+              &nbsp;
+              <button type="button" className="secondary" onClick={() => setCollapsedTypes(new Set())}>
+                Expand all
+              </button>
+            </label>
+          </div>
+        )}
         {loading ? (
           <p className="muted">Loading…</p>
         ) : accounts.length === 0 ? (
@@ -206,30 +252,45 @@ export function AccountsPage() {
                 <th></th>
               </tr>
             </thead>
-            <tbody>
-              {filteredAccounts.map((a) => (
-                <tr key={a.id}>
-                  <td>{a.accountName}</td>
-                  <td>{TYPE_LABELS[a.accountType]}</td>
-                  <td className="muted">{a.institutionName ?? "—"}</td>
-                  <td className="numeric">{balanceDisplay(a)}</td>
-                  <td>
-                    <span className={`status-pill status-${a.status.toLowerCase()}`}>{a.status}</span>
-                    {isPaidOffLoan(a) && <div className="muted paid-off-note">Paid off</div>}
-                  </td>
-                  <td className="row-actions">
-                    <button type="button" className="secondary" onClick={() => startEdit(a)}>
-                      Edit
-                    </button>
-                    {isPaidOffLoan(a) && (
-                      <button type="button" className="secondary" onClick={() => closeAccount(a)} style={{ marginLeft: 6 }}>
-                        Close account
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
+            {accountGroups.map(({ type, accounts: group }) => {
+              const collapsed = collapsedTypes.has(type);
+              const total = group.reduce((sum, a) => sum + accountBalanceMinor(a), 0);
+              return (
+                <tbody key={type}>
+                  <tr className="txn-group-header" onClick={() => toggleType(type)}>
+                    <td colSpan={3}>
+                      <span className={`txn-group-caret ${collapsed ? "collapsed" : ""}`}>▾</span>
+                      {TYPE_LABELS[type]} ({group.length})
+                    </td>
+                    <td className="numeric">{formatMinor(total, baseCurrency)}</td>
+                    <td colSpan={2}></td>
+                  </tr>
+                  {!collapsed &&
+                    group.map((a) => (
+                      <tr key={a.id}>
+                        <td>{a.accountName}</td>
+                        <td>{TYPE_LABELS[a.accountType]}</td>
+                        <td className="muted">{a.institutionName ?? "—"}</td>
+                        <td className="numeric">{balanceDisplay(a)}</td>
+                        <td>
+                          <span className={`status-pill status-${a.status.toLowerCase()}`}>{a.status}</span>
+                          {isPaidOffLoan(a) && <div className="muted paid-off-note">Paid off</div>}
+                        </td>
+                        <td className="row-actions">
+                          <button type="button" className="secondary" onClick={() => startEdit(a)}>
+                            Edit
+                          </button>
+                          {isPaidOffLoan(a) && (
+                            <button type="button" className="secondary" onClick={() => closeAccount(a)} style={{ marginLeft: 6 }}>
+                              Close account
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              );
+            })}
           </table>
           </div>
         )}

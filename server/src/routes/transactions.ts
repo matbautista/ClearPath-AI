@@ -14,32 +14,38 @@ transactionsRouter.get("/rules", (_req, res) => {
 
 transactionsRouter.get("/", (req, res) => {
   const accountId = req.query.accountId ? Number(req.query.accountId) : undefined;
-  const rows = accountId
-    ? db
-        .prepare(
-          `SELECT t.*, sc.name AS spending_category_name,
-                  d.account_name AS destination_account_name, s.account_name AS source_account_name
-           FROM transactions t
-           LEFT JOIN spending_categories sc ON sc.id = t.spending_category_id
-           LEFT JOIN accounts d ON d.id = t.destination_account_id
-           LEFT JOIN accounts s ON s.id = t.source_account_id
-           WHERE t.source_account_id = ?
-           ORDER BY t.txn_date DESC, t.id DESC
-           LIMIT 200`
-        )
-        .all(accountId)
-    : db
-        .prepare(
-          `SELECT t.*, sc.name AS spending_category_name,
-                  d.account_name AS destination_account_name, s.account_name AS source_account_name
-           FROM transactions t
-           LEFT JOIN spending_categories sc ON sc.id = t.spending_category_id
-           LEFT JOIN accounts d ON d.id = t.destination_account_id
-           LEFT JOIN accounts s ON s.id = t.source_account_id
-           ORDER BY t.txn_date DESC, t.id DESC
-           LIMIT 200`
-        )
-        .all();
+  const from = typeof req.query.from === "string" ? req.query.from : undefined;
+  const to = typeof req.query.to === "string" ? req.query.to : undefined;
+
+  const conditions: string[] = [];
+  const params: (string | number)[] = [];
+  if (accountId) {
+    conditions.push("t.source_account_id = ?");
+    params.push(accountId);
+  }
+  if (from) {
+    conditions.push("t.txn_date >= ?");
+    params.push(from);
+  }
+  if (to) {
+    conditions.push("t.txn_date <= ?");
+    params.push(to);
+  }
+  const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+
+  const rows = db
+    .prepare(
+      `SELECT t.*, sc.name AS spending_category_name,
+              d.account_name AS destination_account_name, s.account_name AS source_account_name
+       FROM transactions t
+       LEFT JOIN spending_categories sc ON sc.id = t.spending_category_id
+       LEFT JOIN accounts d ON d.id = t.destination_account_id
+       LEFT JOIN accounts s ON s.id = t.source_account_id
+       ${where}
+       ORDER BY t.txn_date DESC, t.id DESC
+       LIMIT 200`
+    )
+    .all(...params);
 
   res.json(
     (rows as any[]).map((r) => ({

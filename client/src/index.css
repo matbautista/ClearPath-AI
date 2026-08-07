@@ -231,6 +231,31 @@ tr.txn-voided td {
   text-decoration: line-through;
 }
 
+.txn-filters {
+  align-items: end;
+  margin-bottom: 16px;
+}
+
+tr.txn-group-header {
+  cursor: pointer;
+  background: var(--surface-2, transparent);
+  font-weight: 600;
+}
+
+tr.txn-group-header:hover {
+  background: var(--border);
+}
+
+.txn-group-caret {
+  display: inline-block;
+  margin-right: 8px;
+  transition: transform 0.1s ease;
+}
+
+.txn-group-caret.collapsed {
+  transform: rotate(-90deg);
+}
+
 .status-success {
   background: var(--status-active-bg);
   color: var(--status-active-text);

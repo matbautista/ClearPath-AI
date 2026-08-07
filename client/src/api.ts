@@ -350,8 +350,14 @@ export const api = {
 
   // transactions
   transactionRules: (): Promise<TransactionRulesResponse> => get("/api/transactions/rules"),
-  listTransactions: (accountId?: number): Promise<Transaction[]> =>
-    get(`/api/transactions${accountId ? `?accountId=${accountId}` : ""}`),
+  listTransactions: (filters?: { accountId?: number; from?: string; to?: string }): Promise<Transaction[]> => {
+    const params = new URLSearchParams();
+    if (filters?.accountId) params.set("accountId", String(filters.accountId));
+    if (filters?.from) params.set("from", filters.from);
+    if (filters?.to) params.set("to", filters.to);
+    const qs = params.toString();
+    return get(`/api/transactions${qs ? `?${qs}` : ""}`);
+  },
   createTransaction: (input: NewTransactionInput): Promise<{ id: number; linkedTransactionId: number | null }> =>
     post("/api/transactions", input),
   voidTransaction: (id: number): Promise<{ voidedIds: number[] }> => post(`/api/transactions/${id}/void`),

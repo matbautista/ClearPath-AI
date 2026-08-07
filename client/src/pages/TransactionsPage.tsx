@@ -34,6 +34,9 @@ export function TransactionsPage() {
   const [incomeCategories, setIncomeCategories] = useState<string[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [collapsedTypes, setCollapsedTypes] = useState<Set<string>>(new Set());
 
   const [txnType, setTxnType] = useState<string>("CashWithdrawal");
   const [txnDate, setTxnDate] = useState(today());
@@ -49,20 +52,28 @@ export function TransactionsPage() {
   const [errors, setErrors] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
 
-  function loadAll() {
+  function loadTransactions() {
     setLoading(true);
-    Promise.all([api.listAccounts(), api.listCategories(), api.transactionRules(), api.listTransactions()])
-      .then(([acc, cats, rulesResp, txns]) => {
-        setAccounts(acc);
-        setCategories(cats);
-        setRules(rulesResp.rules);
-        setIncomeCategories(rulesResp.incomeCategories);
-        setTransactions(txns);
-      })
+    api
+      .listTransactions({ from: dateFrom || undefined, to: dateTo || undefined })
+      .then(setTransactions)
       .finally(() => setLoading(false));
   }
 
-  useEffect(loadAll, []);
+  useEffect(() => {
+    Promise.all([api.listAccounts(), api.listCategories(), api.transactionRules()]).then(([acc, cats, rulesResp]) => {
+      setAccounts(acc);
+      setCategories(cats);
+      setRules(rulesResp.rules);
+      setIncomeCategories(rulesResp.incomeCategories);
+    });
+  }, []);
+
+  useEffect(loadTransactions, [dateFrom, dateTo]);
+
+  function loadAll() {
+    loadTransactions();
+  }
 
   async function handleVoid(id: number) {
     if (!confirm("Void this transaction? This reverses its balance effect (and its paired leg's, if any) — it does not delete history (2.6).")) return;
@@ -72,6 +83,35 @@ export function TransactionsPage() {
     } catch (err) {
       alert(err instanceof ApiError ? err.errors.join(" ") : "Something went wrong.");
     }
+  }
+
+  // Groups preserve first-appearance order — since transactions arrive
+  // sorted by txn_date DESC, that means the type with the most recent
+  // activity shows first, with no separate sort pass needed.
+  const groups = useMemo(() => {
+    const map = new Map<string, Transaction[]>();
+    for (const t of transactions) {
+      const list = map.get(t.txnType);
+      if (list) list.push(t);
+      else map.set(t.txnType, [t]);
+    }
+    return Array.from(map.entries());
+  }, [transactions]);
+
+  function toggleType(type: string) {
+    setCollapsedTypes((prev) => {
+      const next = new Set(prev);
+      if (next.has(type)) next.delete(type);
+      else next.add(type);
+      return next;
+    });
+  }
+
+  function groupTotalMinor(group: Transaction[]): number {
+    return group.reduce((sum, t) => {
+      if (t.status === "Voided") return sum;
+      return sum + (t.indicator === "Debit" ? -t.amountMinor : t.amountMinor);
+    }, 0);
   }
 
   const rule = rules[txnType];
@@ -164,10 +204,52 @@ export function TransactionsPage() {
       </header>
 
       <section className="transactions-list">
+        <div className="field-row txn-filters">
+          <label>
+            From
+            <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+          </label>
+          <label>
+            To
+            <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+          </label>
+          {(dateFrom || dateTo) && (
+            <label>
+              &nbsp;
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => {
+                  setDateFrom("");
+                  setDateTo("");
+                }}
+              >
+                Clear dates
+              </button>
+            </label>
+          )}
+          {groups.length > 0 && (
+            <>
+              <label>
+                &nbsp;
+                <button type="button" className="secondary" onClick={() => setCollapsedTypes(new Set(groups.map(([type]) => type)))}>
+                  Collapse all
+                </button>
+              </label>
+              <label>
+                &nbsp;
+                <button type="button" className="secondary" onClick={() => setCollapsedTypes(new Set())}>
+                  Expand all
+                </button>
+              </label>
+            </>
+          )}
+        </div>
+
         {loading ? (
           <p className="muted">Loading…</p>
         ) : transactions.length === 0 ? (
-          <p className="muted">No transactions yet.</p>
+          <p className="muted">No transactions in this range.</p>
         ) : (
           <div className="table-scroll">
           <table>
@@ -183,39 +265,57 @@ export function TransactionsPage() {
                 <th></th>
               </tr>
             </thead>
-            <tbody>
-              {transactions.map((t) => (
-                <tr key={t.id} className={t.status === "Voided" ? "txn-voided" : undefined}>
-                  <td>{t.txnDate}</td>
-                  <td>{TXN_TYPE_LABELS[t.txnType] ?? t.txnType}</td>
-                  <td>{t.sourceAccountName}</td>
-                  <td className="muted">{t.spendingCategoryName ?? t.incomeCategory ?? "—"}</td>
-                  <td className="numeric">
-                    {t.indicator === "Debit" ? "-" : "+"}
-                    {formatMinor(t.amountMinor, baseCurrency)}
-                  </td>
-                  <td className="muted">
-                    {t.destinationAccountName
-                      ? t.indicator === "Debit"
-                        ? `→ ${t.destinationAccountName}`
-                        : `← ${t.destinationAccountName}`
-                      : "—"}
-                  </td>
-                  <td>
-                    {t.status !== "Posted" && (
-                      <span className={`status-pill status-${t.status.toLowerCase()}`}>{t.status}</span>
-                    )}
-                  </td>
-                  <td>
-                    {t.status === "Posted" && (
-                      <button type="button" className="secondary" onClick={() => handleVoid(t.id)}>
-                        Void
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
+            {groups.map(([type, group]) => {
+              const collapsed = collapsedTypes.has(type);
+              const total = groupTotalMinor(group);
+              return (
+                <tbody key={type}>
+                  <tr className="txn-group-header" onClick={() => toggleType(type)}>
+                    <td colSpan={4}>
+                      <span className={`txn-group-caret ${collapsed ? "collapsed" : ""}`}>▾</span>
+                      {TXN_TYPE_LABELS[type] ?? type} ({group.length})
+                    </td>
+                    <td className="numeric">
+                      {total < 0 ? "-" : "+"}
+                      {formatMinor(Math.abs(total), baseCurrency)}
+                    </td>
+                    <td colSpan={3}></td>
+                  </tr>
+                  {!collapsed &&
+                    group.map((t) => (
+                      <tr key={t.id} className={t.status === "Voided" ? "txn-voided" : undefined}>
+                        <td>{t.txnDate}</td>
+                        <td>{TXN_TYPE_LABELS[t.txnType] ?? t.txnType}</td>
+                        <td>{t.sourceAccountName}</td>
+                        <td className="muted">{t.spendingCategoryName ?? t.incomeCategory ?? "—"}</td>
+                        <td className="numeric">
+                          {t.indicator === "Debit" ? "-" : "+"}
+                          {formatMinor(t.amountMinor, baseCurrency)}
+                        </td>
+                        <td className="muted">
+                          {t.destinationAccountName
+                            ? t.indicator === "Debit"
+                              ? `→ ${t.destinationAccountName}`
+                              : `← ${t.destinationAccountName}`
+                            : "—"}
+                        </td>
+                        <td>
+                          {t.status !== "Posted" && (
+                            <span className={`status-pill status-${t.status.toLowerCase()}`}>{t.status}</span>
+                          )}
+                        </td>
+                        <td>
+                          {t.status === "Posted" && (
+                            <button type="button" className="secondary" onClick={() => handleVoid(t.id)}>
+                              Void
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              );
+            })}
           </table>
           </div>
         )}
